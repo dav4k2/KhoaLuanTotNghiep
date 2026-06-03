@@ -1,14 +1,16 @@
 # Python
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
+*$py.class
 
 # Virtual Environment
 .venv/
 venv/
+env/
 
-# Environment Variables
+# Environment
 .env
+.env.*
 
 # Firebase
 firebase_service_account.json
@@ -16,5 +18,19 @@ firebase_service_account.json
 # VS Code
 .vscode/
 
+# JetBrains
+.idea/
+
 # Logs
 *.log
+
+# Test
+.pytest_cache/
+
+# Build
+build/
+dist/
+
+# OS
+.DS_Store
+Thumbs.db
