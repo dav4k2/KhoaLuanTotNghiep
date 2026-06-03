@@ -1,0 +1,42 @@
+# .dockerignore
+# Đặt trong thư mục backend/ (cùng cấp Dockerfile)
+# Những file/thư mục này sẽ KHÔNG được copy vào Docker image
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+*.egg-info/
+dist/
+build/
+
+# Môi trường ảo
+.venv/
+venv/
+env/
+
+# Biến môi trường (không để lộ secret)
+.env
+*.env
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs
+*.log
+logs/
+
+# macOS
+.DS_Store

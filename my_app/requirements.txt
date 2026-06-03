@@ -1,0 +1,13 @@
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+sqlalchemy==2.0.36
+psycopg2-binary==2.9.10
+pydantic==2.10.6
+pydantic-settings==2.2.1
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
+python-multipart==0.0.9
+cloudinary==1.41.0
+google-auth==2.53.0
+pyasn1-modules==0.4.2
