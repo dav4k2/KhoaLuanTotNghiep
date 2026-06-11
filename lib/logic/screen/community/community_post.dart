@@ -5,6 +5,7 @@ class CommunityPost {
   final String authorId;
   final String authorName;
   final String? authorAvatar;
+  final String authorRole;        // ← THÊM MỚI: "user" | "expert" | "admin"
   final String content;
   final List<String> imageUrls;
   final int likeCount;
@@ -18,6 +19,7 @@ class CommunityPost {
     required this.authorId,
     required this.authorName,
     this.authorAvatar,
+    this.authorRole = "user",      // ← THÊM MỚI
     required this.content,
     this.imageUrls    = const [],
     this.likeCount    = 0,
@@ -27,9 +29,12 @@ class CommunityPost {
     this.comments = const [],
   });
 
-  // ← Thêm authorName vào copyWith để có thể ghi đè tên
+  // Kiểm tra có phải chuyên gia không
+  bool get isExpert => authorRole == "expert";
+
   CommunityPost copyWith({
     String?            authorName,
+    String?            authorRole,
     int?               likeCount,
     bool?              isLikedByMe,
     int?               commentCount,
@@ -38,8 +43,9 @@ class CommunityPost {
       CommunityPost(
         id:           id,
         authorId:     authorId,
-        authorName:   authorName   ?? this.authorName,  // ← THÊM
+        authorName:   authorName  ?? this.authorName,
         authorAvatar: authorAvatar,
+        authorRole:   authorRole  ?? this.authorRole,  // ← THÊM
         content:      content,
         imageUrls:    imageUrls,
         likeCount:    likeCount    ?? this.likeCount,
@@ -64,6 +70,7 @@ class PostComment {
   final String authorId;
   final String authorName;
   final String? authorAvatar;
+  final String authorRole;     // ← THÊM: "user" | "expert" | "admin"
   final String content;
   final DateTime createdAt;
 
@@ -72,6 +79,7 @@ class PostComment {
     required this.authorId,
     required this.authorName,
     this.authorAvatar,
+    this.authorRole = 'user',  // ← THÊM
     required this.content,
     required this.createdAt,
   });

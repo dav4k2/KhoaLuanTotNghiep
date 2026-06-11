@@ -39,10 +39,8 @@ class CommunityRepository {
     )
         .timeout(ApiEndpoints.timeout);
     _check(res);
-    print('📦 fetchPosts body: ${res.body}'); // ← log tạm để debug
     final decoded = jsonDecode(res.body);
 
-    // Shape A: {"items": [...], "total": N}
     if (decoded is Map<String, dynamic>) {
       final items = (decoded['items'] ?? decoded['data'] ?? decoded['posts'] ?? []) as List;
       final total = decoded['total'] ?? decoded['count'] ?? items.length;
@@ -52,7 +50,6 @@ class CommunityRepository {
       );
     }
 
-    // Shape B: [...] danh sách thẳng
     if (decoded is List) {
       final posts = decoded.map((e) => _postFromJson(e as Map<String, dynamic>)).toList();
       return (posts: posts, total: posts.length);
@@ -62,7 +59,7 @@ class CommunityRepository {
   }
 
   Future<CommunityPost> createPost({
-    required String       content,
+    required String content,
     List<String> imageUrls = const [],
   }) async {
     final res = await http
@@ -113,14 +110,12 @@ class CommunityRepository {
     )
         .timeout(ApiEndpoints.timeout);
     _check(res);
-    return _commentFromJson(
-        jsonDecode(res.body) as Map<String, dynamic>);
+    return _commentFromJson(jsonDecode(res.body) as Map<String, dynamic>);
   }
 
   Future<List<String>> uploadImages(List<File> files) async {
     final token = await TokenStorage.getToken() ?? '';
-    final req =
-    http.MultipartRequest('POST', _uri(ApiEndpoints.uploadImages))
+    final req = http.MultipartRequest('POST', _uri(ApiEndpoints.uploadImages))
       ..headers['Authorization'] = 'Bearer $token'
       ..headers['ngrok-skip-browser-warning'] = 'true';
 
@@ -133,37 +128,24 @@ class CommunityRepository {
     }
 
     final streamed = await req.send();
-    final res      = await http.Response.fromStream(streamed);
+    final res = await http.Response.fromStream(streamed);
     _check(res);
 
     final decoded = jsonDecode(res.body);
-
-    // Shape A: ["https://url1", "https://url2"]  ← danh sách string thẳng
     if (decoded is List) {
       if (decoded.isEmpty) return [];
-      if (decoded.first is String) {
-        return decoded.cast<String>();
-      }
-      // Shape B: [{"url": "https://url1"}, ...]  ← danh sách object
-      return decoded
-          .map((e) => (e as Map<String, dynamic>)['url'] as String)
-          .toList();
+      if (decoded.first is String) return decoded.cast<String>();
+      return decoded.map((e) => (e as Map<String, dynamic>)['url'] as String).toList();
     }
-
-    // Shape C: {"urls": [...]} hoặc {"data": [...]}
     if (decoded is Map) {
       final list = (decoded['urls'] ?? decoded['data'] ?? []) as List;
-      return list.map((e) {
-        return e is String ? e : (e as Map<String, dynamic>)['url'] as String;
-      }).toList();
+      return list.map((e) => e is String ? e : (e as Map<String, dynamic>)['url'] as String).toList();
     }
-
     return [];
   }
 
   void _check(http.Response res) {
     if (res.statusCode == 401) {
-      // Token hết hạn → xoá token → app sẽ redirect về login
       TokenStorage.clearAll();
       throw Exception('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
     }
@@ -176,27 +158,23 @@ class CommunityRepository {
     }
   }
 
-  // ✅ Ưu tiên author_name (full_name từ backend), fallback email
   CommunityPost _postFromJson(Map<String, dynamic> j) {
     final rawName = j['author_name'] as String? ?? '';
-
-    // Nếu backend trả về email → dùng phần trước @
     final displayName = rawName.contains('@')
         ? rawName.split('@').first
-        : rawName.isNotEmpty
-        ? rawName
-        : 'Người dùng';
+        : rawName.isNotEmpty ? rawName : 'Người dùng';
 
     return CommunityPost(
       id:           j['id'].toString(),
       authorId:     j['author_id'].toString(),
-      authorName:   displayName,   // ← họ tên hoặc username sạch
+      authorName:   displayName,
       authorAvatar: j['author_avatar'] as String?,
-      content:      j['content']   as String,
+      authorRole:   j['author_role']   as String? ?? 'user',   // ← THÊM
+      content:      j['content'] as String,
       imageUrls:    List<String>.from(j['image_urls'] ?? []),
-      likeCount:    j['like_count']    as int?  ?? 0,
+      likeCount:    j['like_count']     as int? ?? 0,
       isLikedByMe:  j['is_liked_by_me'] as bool? ?? false,
-      commentCount: j['comment_count'] as int?  ?? 0,
+      commentCount: j['comment_count']  as int? ?? 0,
       createdAt:    DateTime.parse(j['created_at'] as String),
       comments:     (j['comments'] as List? ?? [])
           .map((c) => _commentFromJson(c as Map<String, dynamic>))
@@ -204,21 +182,19 @@ class CommunityRepository {
     );
   }
 
-  // ✅ Ưu tiên author_name, fallback email
   PostComment _commentFromJson(Map<String, dynamic> j) {
     final rawName = j['author_name'] as String? ?? '';
     final displayName = rawName.contains('@')
         ? rawName.split('@').first
-        : rawName.isNotEmpty
-        ? rawName
-        : 'Người dùng';
+        : rawName.isNotEmpty ? rawName : 'Người dùng';
 
     return PostComment(
       id:           j['id'].toString(),
       authorId:     j['author_id'].toString(),
-      authorName:   displayName,   // ← họ tên sạch
+      authorName:   displayName,
       authorAvatar: j['author_avatar'] as String?,
-      content:      j['content']   as String,
+      authorRole:   j['author_role']   as String? ?? 'user',  // ← THÊM
+      content:      j['content'] as String,
       createdAt:    DateTime.parse(j['created_at'] as String),
     );
   }

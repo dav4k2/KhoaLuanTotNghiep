@@ -43,11 +43,8 @@ class _SignupState extends ConsumerState<Signup> {
   }
 
   void _onStateChanged(AuthState state) {
-    if (state.isSuccess) {
-      // ✅ Reset state trước khi điều hướng
+    if (state.isSignUpSuccess) { // ← THAY ĐỔI
       ref.read(authNotifierProvider.notifier).reset();
-
-      // ✅ Hiện thông báo đăng ký thành công
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
@@ -61,9 +58,6 @@ class _SignupState extends ConsumerState<Signup> {
             duration:        Duration(seconds: 2),
           ),
         );
-
-      // ✅ Quay về Login (pop) thay vì pushReplacement
-      // Login.dart sẽ tự reset isLogin = true khi .then() được gọi
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted) Navigator.pop(context);
       });

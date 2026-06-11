@@ -18,20 +18,16 @@ class AuthNotifier extends Notifier<AuthState> {
   // ── Đăng ký — thêm fullName ───────────────────────────────
 
   Future<void> signUp({
-    required String fullName,  // ← THÊM
+    required String fullName,
     required String email,
     required String password,
   }) async {
     state = AuthState.loading();
     try {
-      final response = await _repository.signUp(
-        SignUpRequest(
-          fullName: fullName,  // ← THÊM
-          email:    email,
-          password: password,
-        ),
+      await _repository.signUp(
+        SignUpRequest(fullName: fullName, email: email, password: password),
       );
-      state = AuthState.success(response);
+      state = AuthState.signUpSuccess(); // ← THAY ĐỔI: không có token
     } on ApiException catch (e) {
       state = AuthState.failure(e.userFriendlyMessage);
     } catch (_) {

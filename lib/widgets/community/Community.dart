@@ -257,11 +257,49 @@ class _PostCardState extends ConsumerState<_PostCard> {
             Expanded(child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(p.authorName,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: Colors.black87)),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(p.authorName,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: Colors.black87)),
+                    if (p.authorRole == 'expert') ...[
+                      const SizedBox(width: 5),
+                      Tooltip(
+                        message: 'Chuyên gia',
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF3CD),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                                color: const Color(0xFFFFD700), width: 0.8),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text('★',
+                                  style: TextStyle(
+                                      fontSize: 10,
+                                      color: Color(0xFFB8860B),
+                                      height: 1.2)),
+                              SizedBox(width: 2),
+                              Text('CG',
+                                  style: TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFFB8860B),
+                                      height: 1.2)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
                 Text(p.timeAgo,
                     style: const TextStyle(
                         fontSize: 12, color: Colors.black45)),
@@ -419,11 +457,46 @@ class _CommentTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(comment.authorName,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        color: Colors.black87)),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(comment.authorName,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: Colors.black87)),
+                    if (comment.authorRole == 'expert') ...[
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF3CD),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(
+                              color: const Color(0xFFFFD700), width: 0.8),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('★',
+                                style: TextStyle(
+                                    fontSize: 9,
+                                    color: Color(0xFFB8860B),
+                                    height: 1.2)),
+                            SizedBox(width: 2),
+                            Text('CG',
+                                style: TextStyle(
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFFB8860B),
+                                    height: 1.2)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
                 const SizedBox(height: 2),
                 Text(comment.content,
                     style: const TextStyle(
@@ -581,7 +654,16 @@ class _CreatePostSheetState extends State<_CreatePostSheet> {
             child: ElevatedButton(
               onPressed: () {
                 final t = _ctrl.text.trim();
-                if (t.isEmpty) return;
+                if (t.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Vui lòng nhập nội dung bài đăng'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
+                // Hình ảnh là tuỳ chọn, không bắt buộc
                 widget.onSubmit(t, _picked);
                 Navigator.pop(context);
               },

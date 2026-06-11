@@ -134,9 +134,11 @@ class Taskbar extends ConsumerWidget {
                             fontWeight: FontWeight.w500)),
                     onTap: () {
                       Navigator.pop(context);
-                      Future.delayed(const Duration(milliseconds: 300), () {
+                      // useRootNavigator: true → thoát khỏi Drawer context, dùng Scaffold gốc
+                      Future.microtask(() {
                         showModalBottomSheet(
                           context: context,
+                          useRootNavigator: true, // ← KEY FIX
                           backgroundColor: Colors.transparent,
                           isScrollControlled: true,
                           builder: (_) => const AccountBottomSheet(),
