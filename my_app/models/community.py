@@ -6,12 +6,9 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from database import Base
 
-
 def _uuid() -> str:
     return str(uuid.uuid4())
 
-
-# ── Post (bài viết) ───────────────────────────────
 class Post(Base):
     __tablename__ = "posts"
 
@@ -19,12 +16,12 @@ class Post(Base):
     author_id     = Column(String,      nullable=False)
     author_name   = Column(String(120), nullable=False)
     author_avatar = Column(String,      nullable=True)
+    author_role   = Column(String(20),  nullable=False, default="user")
     content       = Column(Text,        nullable=False)
     image_urls    = Column(ARRAY(Text), default=list)
-
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(),
-                        onupdate=func.now())
+    created_at    = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at    = Column(DateTime(timezone=True), server_default=func.now(),
+                           onupdate=func.now())
 
     comments = relationship(
         "Comment", back_populates="post",
@@ -37,7 +34,6 @@ class Post(Base):
     )
 
 
-# ── Comment (bình luận) ───────────────────────────
 class Comment(Base):
     __tablename__ = "comments"
 
@@ -48,13 +44,13 @@ class Comment(Base):
     author_id     = Column(String,      nullable=False)
     author_name   = Column(String(120), nullable=False)
     author_avatar = Column(String,      nullable=True)
+    author_role   = Column(String(20),  nullable=False, default="user")  # ← THÊM
     content       = Column(Text,        nullable=False)
     created_at    = Column(DateTime(timezone=True), server_default=func.now())
 
     post = relationship("Post", back_populates="comments")
 
 
-# ── Like ──────────────────────────────────────────
 class Like(Base):
     __tablename__ = "likes"
 

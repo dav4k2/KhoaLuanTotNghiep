@@ -1,9 +1,8 @@
 # routers/community_router.py
 
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
-from typing import List, Optional
-import json
+from typing import List
 
 from database import get_db
 from dependencies.auth_dependency import get_current_user
@@ -12,68 +11,113 @@ from models.community import Post, Comment, Like
 from schemas.community_schema import (
     PostCreate, PostOut,
     CommentCreate, CommentOut,
-    LikeOut,
 )
 from services.notification_service import notify_new_comment, notify_new_like
 
 router = APIRouter(prefix="/community", tags=["Community"])
 
 
+# ── Helper: build dict chuẩn cho Flutter ─────────────────────
+def _post_dict(post: Post, current_user_id: str) -> dict:
+    return {
+        "id":             post.id,
+        "author_id":      post.author_id,
+        "author_name":    post.author_name,
+        "author_avatar":  post.author_avatar,
+        "author_role":    post.author_role,                          # ← badge chuyên gia
+        "content":        post.content,
+        "image_urls":     post.image_urls or [],
+        "like_count":     len(post.likes),
+        "is_liked_by_me": any(l.user_id == current_user_id for l in post.likes),
+        "comment_count":  len(post.comments),
+        "created_at":     post.created_at.isoformat(),
+        "updated_at":     post.updated_at.isoformat(),
+        "comments": [
+            {
+                "id":            c.id,
+                "post_id":       c.post_id,
+                "author_id":     c.author_id,
+                "author_name":   c.author_name,
+                "author_avatar": c.author_avatar,
+                "author_role":   c.author_role,   # ← badge chuyên gia trong comment
+                "content":       c.content,
+                "created_at":    c.created_at.isoformat(),
+            }
+            for c in sorted(post.comments, key=lambda c: c.created_at)
+        ],
+    }
+
+
 # ═══════════════════════════════════════════════════════════════
 # POST
 # ═══════════════════════════════════════════════════════════════
 
-@router.post("/posts", response_model=PostOut, status_code=status.HTTP_201_CREATED)
-async def create_post(
-    content: str = Form(...),
-    image_urls: Optional[str] = Form(None),   # JSON string: '["url1","url2"]'
+@router.post("/posts", status_code=status.HTTP_201_CREATED)
+def create_post(                                  # ← đổi async → sync, dùng JSON body
+    payload: PostCreate,                          # ← JSON body thay vì Form
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """
-    Tạo bài viết mới.
-    image_urls truyền dưới dạng JSON string vì multipart/form-data
-    không hỗ trợ array trực tiếp.
-    """
-    parsed_urls = []
-    if image_urls:
-        try:
-            parsed_urls = json.loads(image_urls)
-        except json.JSONDecodeError:
-            parsed_urls = []
+    """Tạo bài viết mới — Flutter gửi JSON body."""
+    role = current_user.role
+    role_str = role.value if hasattr(role, 'value') else str(role)
 
     post = Post(
-        author_id=str(current_user.id),
-        author_name=current_user.full_name or current_user.email,
-        author_avatar=None,         # mở rộng sau khi có avatar feature
-        content=content,
-        image_urls=parsed_urls,
+        author_id     = str(current_user.id),
+        author_name   = current_user.full_name or current_user.email,
+        author_avatar = None,
+        author_role   = role_str,                 # ← lưu role khi đăng bài
+        content       = payload.content,
+        image_urls    = payload.image_urls or [],
     )
     db.add(post)
     db.commit()
     db.refresh(post)
-    return post
+    # Reload với likes/comments để build dict
+    post = (
+        db.query(Post)
+        .options(joinedload(Post.comments), joinedload(Post.likes))
+        .filter(Post.id == post.id)
+        .first()
+    )
+    return _post_dict(post, str(current_user.id))
 
 
-@router.get("/posts", response_model=List[PostOut])
+@router.get("/posts")
 def get_posts(
-    skip: int = 0,
-    limit: int = 20,
+    page:  int = 1,
+    size:  int = 10,
+    skip:  int = 0,          # giữ lại để không break nếu có client cũ
+    limit: int = 0,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Danh sách bài viết mới nhất (feed)."""
-    return (
+    """Danh sách bài viết — hỗ trợ cả page/size lẫn skip/limit."""
+    # Ưu tiên page/size (Flutter mới), fallback skip/limit (client cũ)
+    if limit > 0:
+        offset = skip
+        page_size = limit
+    else:
+        offset    = (page - 1) * size
+        page_size = size
+
+    posts = (
         db.query(Post)
         .options(joinedload(Post.comments), joinedload(Post.likes))
         .order_by(Post.created_at.desc())
-        .offset(skip)
-        .limit(limit)
+        .offset(offset)
+        .limit(page_size)
         .all()
     )
+    total = db.query(Post).count()
+    uid   = str(current_user.id)
+    return {
+        "items": [_post_dict(p, uid) for p in posts],
+        "total": total,
+    }
 
 
-@router.get("/posts/{post_id}", response_model=PostOut)
+@router.get("/posts/{post_id}")
 def get_post(
     post_id: str,
     db: Session = Depends(get_db),
@@ -88,7 +132,7 @@ def get_post(
     )
     if not post:
         raise HTTPException(status_code=404, detail="Không tìm thấy bài viết")
-    return post
+    return _post_dict(post, str(current_user.id))
 
 
 @router.delete("/posts/{post_id}", status_code=status.HTTP_200_OK)
@@ -103,7 +147,6 @@ def delete_post(
         raise HTTPException(status_code=404, detail="Không tìm thấy bài viết")
     if post.author_id != str(current_user.id):
         raise HTTPException(status_code=403, detail="Không có quyền xoá bài viết này")
-
     db.delete(post)
     db.commit()
     return {"message": "Đã xoá bài viết"}
@@ -120,37 +163,34 @@ async def create_comment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """
-    Thêm bình luận vào bài viết.
-    Sau khi tạo thành công → push notification cho chủ bài (nếu không phải chính mình).
-    """
     post = db.query(Post).filter(Post.id == post_id).first()
     if not post:
         raise HTTPException(status_code=404, detail="Không tìm thấy bài viết")
 
+    role = current_user.role
+    role_str = role.value if hasattr(role, 'value') else str(role)
     comment = Comment(
-        post_id=post_id,
-        author_id=str(current_user.id),
-        author_name=current_user.full_name or current_user.email,
-        author_avatar=None,
-        content=body.content,
+        post_id      = post_id,
+        author_id    = str(current_user.id),
+        author_name  = current_user.full_name or current_user.email,
+        author_avatar= None,
+        author_role  = role_str,          # ← lưu role khi bình luận
+        content      = body.content,
     )
     db.add(comment)
     db.commit()
     db.refresh(comment)
 
-    # Gửi notification cho chủ bài — bỏ qua nếu tự comment bài mình
     if post.author_id != str(current_user.id):
         try:
-            owner_id = int(post.author_id)
             await notify_new_comment(
                 db=db,
-                post_owner_id=owner_id,
+                post_owner_id=int(post.author_id),
                 commenter_name=current_user.full_name or current_user.email,
                 post_id=post_id,
             )
         except (ValueError, TypeError):
-            pass    # author_id không parse được → bỏ qua, không crash
+            pass
 
     return comment
 
@@ -176,7 +216,6 @@ def delete_comment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Tác giả comment hoặc tác giả bài viết đều có thể xoá."""
     comment = db.query(Comment).filter(
         Comment.id == comment_id,
         Comment.post_id == post_id,
@@ -185,10 +224,8 @@ def delete_comment(
         raise HTTPException(status_code=404, detail="Không tìm thấy bình luận")
 
     post = db.query(Post).filter(Post.id == post_id).first()
-    is_comment_owner = comment.author_id == str(current_user.id)
-    is_post_owner    = post and post.author_id == str(current_user.id)
-
-    if not (is_comment_owner or is_post_owner):
+    if not (comment.author_id == str(current_user.id) or
+            (post and post.author_id == str(current_user.id))):
         raise HTTPException(status_code=403, detail="Không có quyền xoá bình luận này")
 
     db.delete(comment)
@@ -206,50 +243,40 @@ async def toggle_like(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """
-    Toggle like:
-    - Chưa like → tạo Like + gửi notification cho chủ bài.
-    - Đã like   → xoá Like (unlike), không gửi notification.
-    """
-    post = db.query(Post).filter(Post.id == post_id).first()
+    post = (
+        db.query(Post)
+        .options(joinedload(Post.likes))
+        .filter(Post.id == post_id)
+        .first()
+    )
     if not post:
         raise HTTPException(status_code=404, detail="Không tìm thấy bài viết")
 
-    existing_like = db.query(Like).filter(
+    uid = str(current_user.id)
+    existing = db.query(Like).filter(
         Like.post_id == post_id,
-        Like.user_id == str(current_user.id),
+        Like.user_id == uid,
     ).first()
 
-    if existing_like:
-        db.delete(existing_like)
+    if existing:
+        db.delete(existing)
         db.commit()
-        return {"liked": False, "message": "Đã bỏ thích"}
+        like_count = db.query(Like).filter(Like.post_id == post_id).count()
+        return {"action": "unliked", "like_count": like_count}   # ← Flutter expect action + like_count
 
-    like = Like(post_id=post_id, user_id=str(current_user.id))
-    db.add(like)
+    db.add(Like(post_id=post_id, user_id=uid))
     db.commit()
+    like_count = db.query(Like).filter(Like.post_id == post_id).count()
 
-    # Gửi notification cho chủ bài — bỏ qua nếu tự like bài mình
-    if post.author_id != str(current_user.id):
+    if post.author_id != uid:
         try:
-            owner_id = int(post.author_id)
             await notify_new_like(
                 db=db,
-                post_owner_id=owner_id,
+                post_owner_id=int(post.author_id),
                 liker_name=current_user.full_name or current_user.email,
                 post_id=post_id,
             )
         except (ValueError, TypeError):
             pass
 
-    return {"liked": True, "message": "Đã thích bài viết"}
-
-
-@router.get("/posts/{post_id}/likes", response_model=List[LikeOut])
-def get_likes(
-    post_id: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Danh sách user đã like bài viết."""
-    return db.query(Like).filter(Like.post_id == post_id).all()
+    return {"action": "liked", "like_count": like_count}         # ← Flutter expect action + like_count

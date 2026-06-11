@@ -5,10 +5,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
 from database import Base, engine
-from routers import auth_router, forgot_password_router, community_router, conversation_router, notification_router
+from routers import auth_router, forgot_password_router, community_router, conversation_router, notification_router, admin_router
 
 # Import models để SQLAlchemy tạo bảng
-from models import user, otp, community, conversation, notification                      # ← đổi community_model → community
+from models import user, otp, community, conversation, notification, disease          
 
 Base.metadata.create_all(bind=engine)
 
@@ -30,6 +30,7 @@ app.include_router(forgot_password_router.router)
 app.include_router(community_router.router)
 app.include_router(conversation_router.router)
 app.include_router(notification_router.router)
+app.include_router(admin_router.router)
 
 @app.get("/", tags=["Health"])
 def health_check():

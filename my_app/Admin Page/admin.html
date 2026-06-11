@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LeafDoctor – Admin</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+  :root {
+    --green: #2d6a4f; --green-light: #40916c; --green-bg: #d8f3dc;
+    --red: #c0392b; --red-bg: #fdecea;
+    --orange: #e67e22; --orange-bg: #fef3e2;
+    --blue: #2980b9; --blue-bg: #ebf5fb;
+    --gray: #6c757d; --gray-bg: #f8f9fa;
+    --border: #dee2e6; --white: #fff;
+    --sidebar-w: 220px; --topbar-h: 56px;
+    --shadow: 0 1px 4px rgba(0,0,0,.08);
+    --radius: 8px;
+    --font: 'Segoe UI', system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font); background: var(--gray-bg); color: #212529; font-size: 14px; }
+
+  /* ── Layout ── */
+  .layout { display: flex; min-height: 100vh; }
+  .sidebar {
+    width: var(--sidebar-w); background: var(--green); color: #fff;
+    display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100;
+  }
+  .main { margin-left: var(--sidebar-w); flex: 1; display: flex; flex-direction: column; min-height: 100vh; }
+
+  /* ── Sidebar ── */
+  .sidebar-logo { padding: 20px 16px 16px; border-bottom: 1px solid rgba(255,255,255,.15); }
+  .sidebar-logo h2 { font-size: 17px; font-weight: 600; }
+  .sidebar-logo small { font-size: 11px; opacity: .7; }
+  .nav-group { padding: 12px 0 4px; }
+  .nav-label { font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+    opacity: .55; padding: 0 16px 6px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px; padding: 9px 16px;
+    cursor: pointer; opacity: .8; transition: all .15s; border-left: 3px solid transparent;
+    font-size: 13.5px;
+  }
+  .nav-item:hover { background: rgba(255,255,255,.1); opacity: 1; }
+  .nav-item.active { background: rgba(255,255,255,.15); opacity: 1; border-left-color: #fff; font-weight: 600; }
+  .nav-item i { width: 18px; text-align: center; }
+
+  /* ── Topbar ── */
+  .topbar {
+    height: var(--topbar-h); background: var(--white); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; padding: 0 20px;
+    position: sticky; top: 0; z-index: 50; box-shadow: var(--shadow);
+  }
+  .topbar-title { font-size: 16px; font-weight: 600; color: var(--green); }
+  .topbar-right { display: flex; align-items: center; gap: 12px; }
+  .topbar-right .avatar {
+    width: 34px; height: 34px; border-radius: 50%; background: var(--green-bg);
+    color: var(--green); font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 13px;
+  }
+
+  /* ── API config bar ── */
+  .api-bar {
+    background: #fff3cd; border-bottom: 1px solid #ffc107; padding: 8px 20px;
+    display: flex; align-items: center; gap: 10px; font-size: 13px;
+  }
+  .api-bar input {
+    flex: 1; padding: 5px 10px; border: 1px solid #ffc107; border-radius: 6px; font-size: 13px; max-width: 480px;
+  }
+  .api-bar button { padding: 5px 14px; background: var(--orange); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; }
+
+  /* ── Content ── */
+  .content { padding: 24px; flex: 1; }
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ── Stats ── */
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+  .stat-card {
+    background: var(--white); border-radius: var(--radius); padding: 18px 20px;
+    box-shadow: var(--shadow); border-left: 4px solid var(--green);
+  }
+  .stat-card.orange { border-left-color: var(--orange); }
+  .stat-card.blue { border-left-color: var(--blue); }
+  .stat-card.red { border-left-color: var(--red); }
+  .stat-label { font-size: 12px; color: var(--gray); margin-bottom: 6px; }
+  .stat-val { font-size: 28px; font-weight: 700; color: #212529; }
+  .stat-sub { font-size: 11px; margin-top: 4px; color: var(--gray); }
+  .stat-sub.warn { color: var(--orange); font-weight: 600; }
+
+  /* ── Section header ── */
+  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .section-title { font-size: 15px; font-weight: 600; }
+
+  /* ── Toolbar ── */
+  .toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+  .toolbar input[type=text], .toolbar select {
+    padding: 7px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; outline: none;
+  }
+  .toolbar input[type=text]:focus, .toolbar select:focus { border-color: var(--green-light); }
+
+  /* ── Tabs ── */
+  .tab-bar { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: 16px; }
+  .tab { padding: 8px 18px; cursor: pointer; font-size: 13px; color: var(--gray); border-bottom: 2px solid transparent; margin-bottom: -2px; }
+  .tab:hover { color: var(--green); }
+  .tab.active { color: var(--green); border-bottom-color: var(--green); font-weight: 600; }
+
+  /* ── Table ── */
+  .table-wrap { background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; }
+  thead { background: var(--gray-bg); }
+  th { padding: 10px 14px; text-align: left; font-size: 12px; font-weight: 600; color: var(--gray); border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #f9fffe; }
+  .empty-row td { text-align: center; color: var(--gray); padding: 30px; }
+
+  /* ── Badges ── */
+  .badge { display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .badge-active { background: var(--green-bg); color: var(--green); }
+  .badge-banned { background: var(--red-bg); color: var(--red); }
+  .badge-pending { background: var(--orange-bg); color: var(--orange); }
+  .badge-approved { background: var(--green-bg); color: var(--green); }
+  .badge-rejected { background: var(--red-bg); color: var(--red); }
+  .badge-hidden { background: #f0f0f0; color: #555; }
+  .badge-user { background: var(--gray-bg); color: var(--gray); }
+  .badge-expert { background: var(--blue-bg); color: var(--blue); }
+  .badge-admin { background: #f3e5f5; color: #7b1fa2; }
+
+  /* ── Buttons ── */
+  .btn { padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer; font-size: 12px; font-weight: 500; transition: opacity .15s; }
+  .btn:hover { opacity: .85; }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .btn-green { background: var(--green); color: #fff; }
+  .btn-red { background: var(--red); color: #fff; }
+  .btn-outline { background: #fff; border: 1px solid var(--border); color: #444; }
+  .btn-orange { background: var(--orange); color: #fff; }
+  .btn-sm { padding: 4px 10px; font-size: 11px; }
+  .btn-actions { display: flex; gap: 6px; }
+
+  /* ── Modal ── */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45);
+    z-index: 200; align-items: center; justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--white); border-radius: var(--radius); padding: 28px;
+    width: 420px; max-width: 95vw; box-shadow: 0 8px 32px rgba(0,0,0,.18);
+  }
+  .modal h3 { font-size: 16px; margin-bottom: 18px; }
+  .modal label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 5px; color: var(--gray); }
+  .modal input, .modal select, .modal textarea {
+    width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px;
+    font-size: 13px; margin-bottom: 14px; font-family: inherit; outline: none;
+  }
+  .modal input:focus, .modal select:focus, .modal textarea:focus { border-color: var(--green-light); }
+  .modal textarea { min-height: 80px; resize: vertical; }
+  .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
+
+  /* ── Toast ── */
+  .toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 999; display: flex; flex-direction: column; gap: 8px; }
+  .toast {
+    padding: 12px 20px; border-radius: 8px; color: #fff; font-size: 13px; font-weight: 500;
+    box-shadow: 0 4px 12px rgba(0,0,0,.2); animation: slideIn .25s ease; max-width: 320px;
+  }
+  .toast.success { background: var(--green); }
+  .toast.error { background: var(--red); }
+  .toast.info { background: var(--blue); }
+  @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+  /* ── Loader ── */
+  .loader { text-align: center; padding: 40px; color: var(--gray); }
+  .spinner { display: inline-block; width: 28px; height: 28px; border: 3px solid var(--border); border-top-color: var(--green); border-radius: 50%; animation: spin .7s linear infinite; margin-bottom: 10px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Pagination ── */
+  .pagination { display: flex; align-items: center; gap: 8px; padding: 14px; justify-content: flex-end; }
+  .pagination span { font-size: 13px; color: var(--gray); }
+  .pagination button { padding: 5px 12px; border: 1px solid var(--border); background: #fff; border-radius: 6px; cursor: pointer; font-size: 13px; }
+  .pagination button:disabled { opacity: .4; cursor: not-allowed; }
+  .pagination button.active { background: var(--green); color: #fff; border-color: var(--green); }
+
+  /* ── Two-col dashboard ── */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .card { background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow); }
+  .card-header { padding: 14px 16px; border-bottom: 1px solid var(--border); font-weight: 600; font-size: 14px; display: flex; justify-content: space-between; align-items: center; }
+
+  @media (max-width: 900px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } .two-col { grid-template-columns: 1fr; } }
+  @media (max-width: 600px) { .stats-grid { grid-template-columns: 1fr; } .sidebar { display: none; } .main { margin-left: 0; } }
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <h2>🌿 LeafDoctor</h2>
+      <small>Trang quản trị</small>
+    </div>
+    <nav>
+      <div class="nav-group">
+        <div class="nav-label">Tổng quan</div>
+        <div class="nav-item active" onclick="navigate('dashboard', this)"><i class="fa fa-chart-pie"></i> Dashboard</div>
+      </div>
+      <div class="nav-group">
+        <div class="nav-label">Quản lý</div>
+        <div class="nav-item" onclick="navigate('users', this)"><i class="fa fa-users"></i> Người dùng</div>
+        <div class="nav-item" onclick="navigate('experts', this)"><i class="fa fa-user-graduate"></i> Phân quyền CG</div>
+        <div class="nav-item" onclick="navigate('posts', this)"><i class="fa fa-newspaper"></i> Kiểm duyệt bài</div>
+        <div class="nav-item" onclick="navigate('diseases', this)"><i class="fa fa-leaf"></i> Danh mục bệnh</div>
+      </div>
+    </nav>
+    <div style="margin-top:auto;padding:16px;font-size:11px;opacity:.5;border-top:1px solid rgba(255,255,255,.1)">
+      LeafDoctor Admin v1.0
+    </div>
+  </aside>
+
+  <!-- ── Main ── -->
+  <div class="main">
+
+    <!-- Topbar -->
+    <div class="topbar">
+      <span class="topbar-title" id="page-title">Dashboard</span>
+      <div class="topbar-right">
+        <span id="admin-email" style="font-size:13px;color:#666"></span>
+        <div class="avatar" id="admin-avatar">AD</div>
+        <button class="btn btn-outline btn-sm" onclick="logout()">Đăng xuất</button>
+      </div>
+    </div>
+
+    <!-- API config bar -->
+    <div class="api-bar" id="api-bar">
+      <i class="fa fa-link" style="color:#e67e22"></i>
+      <strong>Ngrok URL:</strong>
+      <input type="text" id="api-url-input" placeholder="https://xxxx-xxx.ngrok-free.app" value="">
+      <button onclick="saveApiUrl()">Lưu & kết nối</button>
+      <span id="api-status" style="font-size:12px;color:#666"></span>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+
+      <!-- ── LOGIN PAGE ── -->
+      <div id="page-login" class="page active" style="max-width:400px;margin:60px auto">
+        <div style="background:#fff;padding:36px;border-radius:12px;box-shadow:var(--shadow)">
+          <h2 style="text-align:center;color:var(--green);margin-bottom:6px">🌿 LeafDoctor</h2>
+          <p style="text-align:center;color:var(--gray);margin-bottom:24px;font-size:13px">Trang quản trị</p>
+          <label style="display:block;font-size:12px;font-weight:600;color:var(--gray);margin-bottom:5px">Email</label>
+          <input type="email" id="login-email" placeholder="admin@leafdoctor.com"
+            style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:6px;margin-bottom:14px;font-size:13px">
+          <label style="display:block;font-size:12px;font-weight:600;color:var(--gray);margin-bottom:5px">Mật khẩu</label>
+          <input type="password" id="login-password" placeholder="••••••••"
+            style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:6px;margin-bottom:20px;font-size:13px"
+            onkeydown="if(event.key==='Enter')doLogin()">
+          <button class="btn btn-green" style="width:100%;padding:10px" onclick="doLogin()">Đăng nhập</button>
+          <div id="login-error" style="color:var(--red);font-size:12px;margin-top:10px;text-align:center"></div>
+        </div>
+      </div>
+
+      <!-- ── DASHBOARD ── -->
+      <div id="page-dashboard" class="page">
+        <div class="stats-grid" id="stats-grid">
+          <div class="loader"><div class="spinner"></div><br>Đang tải...</div>
+        </div>
+        <div class="two-col">
+          <div class="card">
+            <div class="card-header">Yêu cầu phân quyền chuyên gia <a href="#" onclick="navigate('experts',document.querySelector('.nav-item:nth-child(3)'))" style="font-size:12px;color:var(--green)">Xem tất cả</a></div>
+            <div id="dash-experts"><div class="loader"><div class="spinner"></div></div></div>
+          </div>
+          <div class="card">
+            <div class="card-header">Bài đăng chờ kiểm duyệt <a href="#" onclick="navigate('posts',document.querySelectorAll('.nav-item')[3])" style="font-size:12px;color:var(--green)">Xem tất cả</a></div>
+            <div id="dash-posts"><div class="loader"><div class="spinner"></div></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── USERS ── -->
+      <div id="page-users" class="page">
+        <div class="toolbar">
+          <input type="text" id="user-search" placeholder="🔍 Tìm tên, email..." oninput="debounce(loadUsers,400)()">
+          <select id="user-role-filter" onchange="loadUsers()">
+            <option value="">Tất cả vai trò</option>
+            <option value="user">User</option>
+            <option value="expert">Chuyên gia</option>
+            <option value="admin">Admin</option>
+          </select>
+          <select id="user-status-filter" onchange="loadUsers()">
+            <option value="">Tất cả trạng thái</option>
+            <option value="active">Đang hoạt động</option>
+            <option value="banned">Bị khóa</option>
+          </select>
+        </div>
+        <div class="table-wrap" id="users-table-wrap"><div class="loader"><div class="spinner"></div></div></div>
+        <div class="pagination" id="users-pagination"></div>
+      </div>
+
+      <!-- ── EXPERTS ── -->
+      <div id="page-experts" class="page">
+        <div class="tab-bar">
+          <div class="tab active" onclick="setExpertTab('all',this)">Tất cả người dùng</div>
+          <div class="tab" onclick="setExpertTab('experts',this)">Chuyên gia đã duyệt</div>
+        </div>
+        <div style="margin-bottom:12px;display:flex;gap:10px;align-items:center">
+          <input type="text" id="expert-search" placeholder="🔍 Tìm tên, email..." oninput="debounce(loadExperts,400)()" style="padding:7px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;width:260px">
+          <span id="experts-count" style="font-size:13px;color:var(--gray)"></span>
+        </div>
+        <div class="table-wrap" id="experts-table-wrap"><div class="loader"><div class="spinner"></div></div></div>
+        <div class="pagination" id="experts-pagination"></div>
+      </div>
+
+      <!-- ── POSTS ── -->
+      <div id="page-posts" class="page">
+        <div class="toolbar">
+          <input type="text" id="post-search" placeholder="🔍 Tìm tiêu đề..." oninput="debounce(loadPosts,400)()">
+          <select id="post-status-filter" onchange="loadPosts()">
+            <option value="">Tất cả</option>
+            <option value="pending">Chờ duyệt</option>
+            <option value="approved">Đã duyệt</option>
+            <option value="hidden">Đã ẩn</option>
+          </select>
+        </div>
+        <div class="table-wrap" id="posts-table-wrap"><div class="loader"><div class="spinner"></div></div></div>
+        <div class="pagination" id="posts-pagination"></div>
+      </div>
+
+      <!-- ── DISEASES ── -->
+      <div id="page-diseases" class="page">
+        <div class="toolbar">
+          <input type="text" id="disease-search" placeholder="🔍 Tìm tên bệnh..." oninput="debounce(loadDiseases,400)()">
+          <button class="btn btn-green" onclick="openDiseaseModal()"><i class="fa fa-plus"></i> Thêm bệnh</button>
+        </div>
+        <div class="table-wrap" id="diseases-table-wrap"><div class="loader"><div class="spinner"></div></div></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ── TOAST ── -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- ── MODAL: Reject Expert ── -->
+<div class="modal-overlay" id="modal-reject">
+  <div class="modal">
+    <h3>Từ chối yêu cầu chuyên gia</h3>
+    <label>Lý do từ chối</label>
+    <textarea id="reject-reason" placeholder="Nhập lý do từ chối..."></textarea>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-reject')">Hủy</button>
+      <button class="btn btn-red" onclick="confirmReject()">Xác nhận từ chối</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL: Disease ── -->
+<div class="modal-overlay" id="modal-disease">
+  <div class="modal">
+    <h3 id="disease-modal-title">Thêm danh mục bệnh</h3>
+    <input type="hidden" id="disease-modal-id">
+    <label>Tên tiếng Anh (PlantVillage label)</label>
+    <input type="text" id="disease-name-en" placeholder="vd: Tomato___Late_blight">
+    <label>Tên tiếng Việt</label>
+    <input type="text" id="disease-name-vi" placeholder="vd: Mốc sương cà chua">
+    <label>Cây trồng</label>
+    <input type="text" id="disease-plant" placeholder="vd: Cà chua">
+    <label>Mô tả (tùy chọn)</label>
+    <textarea id="disease-desc" placeholder="Triệu chứng, cách nhận biết..."></textarea>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-disease')">Hủy</button>
+      <button class="btn btn-green" onclick="saveDisease()">Lưu</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────────
+let API_URL = localStorage.getItem('ld_api_url') || '';
+let TOKEN   = localStorage.getItem('ld_token') || '';
+let currentPage = 'login';
+let usersPage = 1;
+let postsPage = 1;
+let expertTabStatus = 'pending';
+let rejectTargetId = null;
+
+// ── Init ───────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  if (API_URL) document.getElementById('api-url-input').value = API_URL;
+  if (TOKEN) {
+    showMainApp();
+  }
+});
+
+// ── API URL ────────────────────────────────────────────────────────────────────
+function saveApiUrl() {
+  const val = document.getElementById('api-url-input').value.trim().replace(/\/$/, '');
+  if (!val) { toast('Vui lòng nhập ngrok URL', 'error'); return; }
+  API_URL = val;
+  localStorage.setItem('ld_api_url', API_URL);
+  document.getElementById('api-status').textContent = '✅ Đã lưu';
+  toast('Đã lưu API URL: ' + API_URL, 'success');
+}
+
+// ── HTTP helpers ───────────────────────────────────────────────────────────────
+async function api(method, path, body = null) {
+  if (!API_URL) { toast('Chưa cấu hình Ngrok URL!', 'error'); throw new Error('No API URL'); }
+  const opts = {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${TOKEN}`,
+      'ngrok-skip-browser-warning': '1',
+    }
+  };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(API_URL + path, opts);
+  if (res.status === 401) { logout(); return; }
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || 'Lỗi không xác định');
+  return data;
+}
+
+// ── Auth ───────────────────────────────────────────────────────────────────────
+async function doLogin() {
+  const email = document.getElementById('login-email').value;
+  const pass  = document.getElementById('login-password').value;
+  document.getElementById('login-error').textContent = '';
+  if (!API_URL) { document.getElementById('login-error').textContent = 'Vui lòng nhập Ngrok URL trước!'; return; }
+  try {
+    
+    const res = await fetch(API_URL + '/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1' },
+      body: JSON.stringify({ email: email, password: pass }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      let msg = 'Sai thông tin đăng nhập';
+      if (data.detail) {
+        if (typeof data.detail === 'string') msg = data.detail;
+        else if (Array.isArray(data.detail)) msg = data.detail.map(e => e.msg).join(', ');
+      }
+      throw new Error(msg);
+    }
+    TOKEN = data.access_token;
+    localStorage.setItem('ld_token', TOKEN);
+    showMainApp();
+  } catch(e) {
+    document.getElementById('login-error').textContent = e.message;
+  }
+}
+
+function logout() {
+  TOKEN = '';
+  localStorage.removeItem('ld_token');
+  showPage('login');
+  document.getElementById('api-bar').style.display = 'flex';
+}
+
+function showMainApp() {
+  document.getElementById('api-bar').style.display = 'flex';
+  navigate('dashboard', document.querySelector('.nav-item'));
+  // Decode JWT để lấy email (đơn giản)
+  try {
+    const payload = JSON.parse(atob(TOKEN.split('.')[1]));
+    document.getElementById('admin-email').textContent = payload.sub || '';
+    document.getElementById('admin-avatar').textContent = (payload.sub || 'AD')[0].toUpperCase();
+  } catch {}
+}
+
+// ── Navigation ─────────────────────────────────────────────────────────────────
+const PAGE_TITLES = { login:'Đăng nhập', dashboard:'Dashboard', users:'Quản lý người dùng', experts:'Phân quyền chuyên gia', posts:'Kiểm duyệt bài đăng', diseases:'Danh mục bệnh' };
+
+function navigate(page, el) {
+  if (!TOKEN && page !== 'login') return;
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  if (el) el.classList.add('active');
+  showPage(page);
+  document.getElementById('page-title').textContent = PAGE_TITLES[page] || page;
+  if (page === 'dashboard') loadDashboard();
+  if (page === 'users') { usersPage = 1; loadUsers(); }
+  if (page === 'experts') loadExperts();
+  if (page === 'posts') { postsPage = 1; loadPosts(); }
+  if (page === 'diseases') loadDiseases();
+}
+
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+}
+
+// ── Dashboard ──────────────────────────────────────────────────────────────────
+async function loadDashboard() {
+  try {
+    const stats = await api('GET', '/admin/dashboard');
+    document.getElementById('stats-grid').innerHTML = `
+      <div class="stat-card"><div class="stat-label"><i class="fa fa-users"></i> Người dùng</div><div class="stat-val">${stats.total_users.toLocaleString()}</div><div class="stat-sub warn">+${stats.new_users_today} hôm nay</div></div>
+      <div class="stat-card orange"><div class="stat-label"><i class="fa fa-user-graduate"></i> Chuyên gia</div><div class="stat-val">${stats.total_experts}</div><div class="stat-sub warn">${stats.pending_expert_requests} chờ duyệt</div></div>
+      <div class="stat-card blue"><div class="stat-label"><i class="fa fa-newspaper"></i> Bài đăng</div><div class="stat-val">${stats.total_posts.toLocaleString()}</div><div class="stat-sub warn">${stats.pending_posts} chờ duyệt</div></div>
+      <div class="stat-card red"><div class="stat-label"><i class="fa fa-leaf"></i> Danh mục bệnh</div><div class="stat-val">${stats.total_diseases}</div><div class="stat-sub">PlantVillage classes</div></div>
+    `;
+    // Mini tables
+    const expData = await api('GET', '/admin/expert-requests?status=pending');
+    const expItems = (expData.items || []).slice(0, 4);
+    document.getElementById('dash-experts').innerHTML = expItems.length ? `
+      <table><thead><tr><th>Họ tên</th><th>Chuyên môn</th><th></th></tr></thead><tbody>
+      ${expItems.map(r => `<tr><td>${r.full_name}</td><td>${r.specialization}</td><td><button class="btn btn-green btn-sm" onclick="quickApprove(${r.id})">Duyệt</button></td></tr>`).join('')}
+      </tbody></table>` : '<div class="loader" style="padding:20px">Không có yêu cầu nào.</div>';
+
+    const postData = await api('GET', '/admin/posts?status=pending&page_size=4');
+    const postItems = (postData.items || []).slice(0, 4);
+    document.getElementById('dash-posts').innerHTML = postItems.length ? `
+      <table><thead><tr><th>Tiêu đề</th><th>Tác giả</th><th></th></tr></thead><tbody>
+      ${postItems.map(p => `<tr><td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.title}</td><td>${p.author_name}</td><td><button class="btn btn-green btn-sm" onclick="quickApprovePost(${p.id})">Duyệt</button></td></tr>`).join('')}
+      </tbody></table>` : '<div class="loader" style="padding:20px">Không có bài nào.</div>';
+  } catch(e) {
+    toast('Lỗi tải dashboard: ' + e.message, 'error');
+  }
+}
+
+async function quickApprove(id) {
+  try {
+    await api('PATCH', `/admin/expert-requests/${id}/review`, { action: 'approve' });
+    toast('Đã duyệt chuyên gia!', 'success');
+    loadDashboard();
+  } catch(e) { toast(e.message, 'error'); }
+}
+async function quickApprovePost(id) {
+  try {
+    await api('PATCH', `/admin/posts/${id}/status`, { status: 'approved' });
+    toast('Đã duyệt bài đăng!', 'success');
+    loadDashboard();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+// ── Users ──────────────────────────────────────────────────────────────────────
+async function loadUsers() {
+  const search = document.getElementById('user-search').value;
+  const role   = document.getElementById('user-role-filter').value;
+  const status = document.getElementById('user-status-filter').value;
+  let url = `/admin/users?page=${usersPage}&page_size=15`;
+  if (search) url += `&search=${encodeURIComponent(search)}`;
+  if (role)   url += `&role=${role}`;
+  if (status) url += `&status=${status}`;
+  document.getElementById('users-table-wrap').innerHTML = '<div class="loader"><div class="spinner"></div></div>';
+  try {
+    const data = await api('GET', url);
+    const rows = data.items.map(u => `
+      <tr>
+        <td>${u.full_name || '—'}</td>
+        <td style="color:#666;font-size:12px">${u.email}</td>
+        <td><span class="badge badge-${u.role}">${roleLabel(u.role)}</span></td>
+        <td>${fmtDate(u.created_at)}</td>
+        <td><span class="badge badge-${u.status}">${u.status === 'active' ? 'Hoạt động' : 'Bị khóa'}</span></td>
+        <td><div class="btn-actions">
+          ${u.role !== 'admin'
+            ? (u.status === 'active'
+                ? `<button class="btn btn-red btn-sm" onclick="banUser(${u.id})">Khóa</button>`
+                : `<button class="btn btn-green btn-sm" onclick="unbanUser(${u.id})">Mở khóa</button>`)
+            : '<span style="color:#aaa;font-size:12px">—</span>'}
+        </div></td>
+      </tr>`).join('') || '<tr class="empty-row"><td colspan="6">Không có người dùng nào.</td></tr>';
+    document.getElementById('users-table-wrap').innerHTML = `
+      <table><thead><tr><th>Họ tên</th><th>Email</th><th>Vai trò</th><th>Ngày tạo</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+      <tbody>${rows}</tbody></table>`;
+    renderPagination('users-pagination', usersPage, data.total, 15, p => { usersPage = p; loadUsers(); });
+  } catch(e) { toast('Lỗi: ' + e.message, 'error'); }
+}
+
+async function banUser(id) {
+  if (!confirm('Bạn có chắc muốn khóa tài khoản này?')) return;
+  try { await api('PATCH', `/admin/users/${id}/ban`); toast('Đã khóa tài khoản.', 'success'); loadUsers(); }
+  catch(e) { toast(e.message, 'error'); }
+}
+async function unbanUser(id) {
+  try { await api('PATCH', `/admin/users/${id}/unban`); toast('Đã mở khóa tài khoản.', 'success'); loadUsers(); }
+  catch(e) { toast(e.message, 'error'); }
+}
+
+async function setRole(id, role, name) {
+  const label = role === 'expert' ? 'Chuyên gia' : 'Người dùng thường';
+  if (!confirm(`Đổi role của "${name}" thành ${label}?`)) return;
+  try {
+    const res = await api('PATCH', `/admin/users/${id}/role`, { role });
+    toast(res.message, 'success');
+    loadUsers();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+// ── Experts ────────────────────────────────────────────────────────────────────
+let expertTab = 'all';   // 'all' | 'experts'
+let expertsPage = 1;
+
+function setExpertTab(tab, el) {
+  document.querySelectorAll('#page-experts .tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  expertTab = tab;
+  expertsPage = 1;
+  loadExperts();
+}
+
+async function loadExperts() {
+  const search = document.getElementById('expert-search')?.value || '';
+  document.getElementById('experts-table-wrap').innerHTML = '<div class="loader"><div class="spinner"></div></div>';
+
+  try {
+    if (expertTab === 'experts') {
+      // Tab "Chuyên gia đã duyệt" — lọc từ /admin/users?role=expert
+      let url = `/admin/users?page=${expertsPage}&page_size=15&role=expert`;
+      if (search) url += `&search=${encodeURIComponent(search)}`;
+      const data = await api('GET', url);
+      document.getElementById('experts-count').textContent = `${data.total} chuyên gia`;
+      const rows = data.items.map(u => `
+        <tr>
+          <td>
+            <div style="font-weight:500">${u.full_name || '—'}</div>
+          </td>
+          <td style="color:#666;font-size:12px">${u.email}</td>
+          <td>${fmtDate(u.created_at)}</td>
+          <td><span class="badge badge-active">Đang hoạt động</span></td>
+          <td><div class="btn-actions">
+            <button class="btn btn-outline btn-sm" onclick="setRole(${u.id},'user','${(u.full_name||u.email).replace(/'/g,'')}')" title="Thu hồi quyền chuyên gia">
+              ↓ Thu hồi
+            </button>
+          </div></td>
+        </tr>`).join('') || '<tr class="empty-row"><td colspan="5">Chưa có chuyên gia nào.</td></tr>';
+      document.getElementById('experts-table-wrap').innerHTML = `
+        <table><thead><tr>
+          <th>Họ tên</th><th>Email</th><th>Ngày tạo</th><th>Trạng thái</th><th>Thao tác</th>
+        </tr></thead><tbody>${rows}</tbody></table>`;
+      renderPagination('experts-pagination', expertsPage, data.total, 15, p => { expertsPage = p; loadExperts(); });
+
+    } else {
+      // Tab "Tất cả người dùng" — chỉ lấy role=user để phân quyền
+      let url = `/admin/users?page=${expertsPage}&page_size=15&role=user`;
+      if (search) url += `&search=${encodeURIComponent(search)}`;
+      const data = await api('GET', url);
+      document.getElementById('experts-count').textContent = `${data.total} người dùng`;
+      const rows = data.items.map(u => `
+        <tr>
+          <td>
+            <div style="font-weight:500">${u.full_name || '—'}</div>
+          </td>
+          <td style="color:#666;font-size:12px">${u.email}</td>
+          <td><span class="badge badge-${u.status}">${u.status === 'active' ? 'Hoạt động' : 'Bị khóa'}</span></td>
+          <td>${fmtDate(u.created_at)}</td>
+          <td><div class="btn-actions">
+            <button class="btn btn-orange btn-sm" onclick="promoteToExpert(${u.id},'${(u.full_name||u.email).replace(/'/g,'')}')">
+              ★ Nâng lên Expert
+            </button>
+          </div></td>
+        </tr>`).join('') || '<tr class="empty-row"><td colspan="5">Không có người dùng nào.</td></tr>';
+      document.getElementById('experts-table-wrap').innerHTML = `
+        <table><thead><tr>
+          <th>Họ tên</th><th>Email</th><th>Trạng thái</th><th>Ngày tạo</th><th>Thao tác</th>
+        </tr></thead><tbody>${rows}</tbody></table>`;
+      renderPagination('experts-pagination', expertsPage, data.total, 15, p => { expertsPage = p; loadExperts(); });
+    }
+  } catch(e) { toast('Lỗi: ' + e.message, 'error'); }
+}
+
+async function promoteToExpert(id, name) {
+  if (!confirm(`Nâng "${name}" lên Chuyên gia?`)) return;
+  try {
+    const res = await api('PATCH', `/admin/users/${id}/role`, { role: 'expert' });
+    toast(res.message || 'Đã nâng lên Chuyên gia!', 'success');
+    loadExperts();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+// ── Posts ──────────────────────────────────────────────────────────────────────
+async function loadPosts() {
+  const search = document.getElementById('post-search').value;
+  const status = document.getElementById('post-status-filter').value;
+  let url = `/admin/posts?page=${postsPage}&page_size=15`;
+  if (search) url += `&search=${encodeURIComponent(search)}`;
+  if (status) url += `&status=${status}`;
+  document.getElementById('posts-table-wrap').innerHTML = '<div class="loader"><div class="spinner"></div></div>';
+  try {
+    const data = await api('GET', url);
+    const rows = data.items.map(p => `
+      <tr>
+        <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.title}</td>
+        <td>${p.author_name}</td>
+        <td><span class="badge badge-${p.author_role}">${roleLabel(p.author_role)}</span></td>
+        <td>${fmtDate(p.created_at)}</td>
+        <td><span class="badge badge-${p.status}">${postStatusLabel(p.status)}</span></td>
+        <td><div class="btn-actions">
+          ${p.status !== 'approved' ? `<button class="btn btn-green btn-sm" onclick="updatePost(${p.id},'approved')">Duyệt</button>` : ''}
+          ${p.status !== 'hidden'   ? `<button class="btn btn-outline btn-sm" onclick="updatePost(${p.id},'hidden')">Ẩn</button>` : ''}
+        </div></td>
+      </tr>`).join('') || '<tr class="empty-row"><td colspan="6">Không có bài đăng nào.</td></tr>';
+    document.getElementById('posts-table-wrap').innerHTML = `
+      <table><thead><tr><th>Tiêu đề</th><th>Tác giả</th><th>Vai trò</th><th>Ngày đăng</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+      <tbody>${rows}</tbody></table>`;
+    renderPagination('posts-pagination', postsPage, data.total, 15, p => { postsPage = p; loadPosts(); });
+  } catch(e) { toast('Lỗi: ' + e.message, 'error'); }
+}
+
+async function updatePost(id, status) {
+  try { await api('PATCH', `/admin/posts/${id}/status`, { status }); toast('Đã cập nhật bài đăng.', 'success'); loadPosts(); }
+  catch(e) { toast(e.message, 'error'); }
+}
+
+// ── Diseases ───────────────────────────────────────────────────────────────────
+async function loadDiseases() {
+  const search = document.getElementById('disease-search').value;
+  let url = '/admin/diseases';
+  if (search) url += `?search=${encodeURIComponent(search)}`;
+  document.getElementById('diseases-table-wrap').innerHTML = '<div class="loader"><div class="spinner"></div></div>';
+  try {
+    const data = await api('GET', url);
+    const rows = data.map((d, i) => `
+      <tr>
+        <td style="color:#999;font-size:12px">${d.id}</td>
+        <td style="font-family:monospace;font-size:12px;color:#555">${d.name_en}</td>
+        <td><strong>${d.name_vi}</strong></td>
+        <td>${d.plant}</td>
+        <td style="color:#888;font-size:12px">${d.description || '—'}</td>
+        <td><div class="btn-actions">
+          <button class="btn btn-outline btn-sm" onclick="openEditDisease(${JSON.stringify(d).replace(/"/g,'&quot;')})">Sửa</button>
+          <button class="btn btn-red btn-sm" onclick="deleteDisease(${d.id}, '${d.name_vi}')">Xóa</button>
+        </div></td>
+      </tr>`).join('') || '<tr class="empty-row"><td colspan="6">Không có danh mục nào.</td></tr>';
+    document.getElementById('diseases-table-wrap').innerHTML = `
+      <table><thead><tr><th>#</th><th>Tên tiếng Anh</th><th>Tên tiếng Việt</th><th>Cây trồng</th><th>Mô tả</th><th>Thao tác</th></tr></thead>
+      <tbody>${rows}</tbody></table>`;
+  } catch(e) { toast('Lỗi: ' + e.message, 'error'); }
+}
+
+function openDiseaseModal(d = null) {
+  document.getElementById('disease-modal-title').textContent = d ? 'Sửa danh mục bệnh' : 'Thêm danh mục bệnh';
+  document.getElementById('disease-modal-id').value = d ? d.id : '';
+  document.getElementById('disease-name-en').value = d ? d.name_en : '';
+  document.getElementById('disease-name-vi').value = d ? d.name_vi : '';
+  document.getElementById('disease-plant').value = d ? d.plant : '';
+  document.getElementById('disease-desc').value = d ? (d.description || '') : '';
+  document.getElementById('disease-name-en').disabled = !!d;
+  openModal('modal-disease');
+}
+
+function openEditDisease(d) { openDiseaseModal(d); }
+
+async function saveDisease() {
+  const id = document.getElementById('disease-modal-id').value;
+  const body = {
+    name_en: document.getElementById('disease-name-en').value.trim(),
+    name_vi: document.getElementById('disease-name-vi').value.trim(),
+    plant:   document.getElementById('disease-plant').value.trim(),
+    description: document.getElementById('disease-desc').value.trim() || null,
+  };
+  if (!body.name_vi || !body.plant) { toast('Vui lòng điền đầy đủ thông tin', 'error'); return; }
+  try {
+    if (id) {
+      await api('PATCH', `/admin/diseases/${id}`, { name_vi: body.name_vi, plant: body.plant, description: body.description });
+      toast('Đã cập nhật danh mục bệnh.', 'success');
+    } else {
+      if (!body.name_en) { toast('Vui lòng nhập tên tiếng Anh', 'error'); return; }
+      await api('POST', '/admin/diseases', body);
+      toast('Đã thêm danh mục bệnh.', 'success');
+    }
+    closeModal('modal-disease'); loadDiseases();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function deleteDisease(id, name) {
+  if (!confirm(`Xóa bệnh "${name}"? Hành động này không thể hoàn tác.`)) return;
+  try { await api('DELETE', `/admin/diseases/${id}`); toast('Đã xóa.', 'info'); loadDiseases(); }
+  catch(e) { toast(e.message, 'error'); }
+}
+
+// ── Utilities ──────────────────────────────────────────────────────────────────
+function renderPagination(containerId, page, total, pageSize, onPageChange) {
+  const totalPages = Math.ceil(total / pageSize);
+  if (totalPages <= 1) { document.getElementById(containerId).innerHTML = ''; return; }
+  let html = `<span>Tổng: ${total} | Trang ${page}/${totalPages}</span>`;
+  html += `<button onclick="(${onPageChange.toString()})(${page-1})" ${page<=1?'disabled':''}>‹ Trước</button>`;
+  for (let p = Math.max(1,page-2); p <= Math.min(totalPages,page+2); p++) {
+    html += `<button class="${p===page?'active':''}" onclick="(${onPageChange.toString()})(${p})">${p}</button>`;
+  }
+  html += `<button onclick="(${onPageChange.toString()})(${page+1})" ${page>=totalPages?'disabled':''}>Sau ›</button>`;
+  document.getElementById(containerId).innerHTML = html;
+}
+
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if(e.target===o) o.classList.remove('open'); }));
+
+function toast(msg, type = 'success') {
+  const c = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('vi-VN', { day:'2-digit', month:'2-digit', year:'numeric' });
+}
+
+function roleLabel(r) { return { user:'User', expert:'Chuyên gia', admin:'Admin' }[r] || r; }
+function statusLabel(s) { return { pending:'Chờ duyệt', approved:'Đã duyệt', rejected:'Từ chối' }[s] || s; }
+function postStatusLabel(s) { return { pending:'Chờ duyệt', approved:'Đã duyệt', hidden:'Đã ẩn' }[s] || s; }
+
+let _debounceTimers = {};
+function debounce(fn, delay) {
+  return function(...args) {
+    clearTimeout(_debounceTimers[fn.name]);
+    _debounceTimers[fn.name] = setTimeout(() => fn(...args), delay);
+  };
+}
+</script>
+</body>
+</html>
