@@ -208,7 +208,7 @@
         <div class="nav-label">Quản lý</div>
         <div class="nav-item" onclick="navigate('users', this)"><i class="fa fa-users"></i> Người dùng</div>
         <div class="nav-item" onclick="navigate('experts', this)"><i class="fa fa-user-graduate"></i> Phân quyền CG</div>
-        <div class="nav-item" onclick="navigate('posts', this)"><i class="fa fa-newspaper"></i> Kiểm duyệt bài</div>
+        <div class="nav-item" onclick="navigate('posts', this)"><i class="fa fa-newspaper"></i> Bài đăng</div>
         <div class="nav-item" onclick="navigate('diseases', this)"><i class="fa fa-leaf"></i> Danh mục bệnh</div>
       </div>
     </nav>
@@ -270,7 +270,7 @@
             <div id="dash-experts"><div class="loader"><div class="spinner"></div></div></div>
           </div>
           <div class="card">
-            <div class="card-header">Bài đăng chờ kiểm duyệt <a href="#" onclick="navigate('posts',document.querySelectorAll('.nav-item')[3])" style="font-size:12px;color:var(--green)">Xem tất cả</a></div>
+            <div class="card-header">Bài đăng mới nhất <a href="#" onclick="navigate('posts',document.querySelectorAll('.nav-item')[3])" style="font-size:12px;color:var(--green)">Xem tất cả</a></div>
             <div id="dash-posts"><div class="loader"><div class="spinner"></div></div></div>
           </div>
         </div>
@@ -313,13 +313,13 @@
       <!-- ── POSTS ── -->
       <div id="page-posts" class="page">
         <div class="toolbar">
-          <input type="text" id="post-search" placeholder="🔍 Tìm tiêu đề..." oninput="debounce(loadPosts,400)()">
-          <select id="post-status-filter" onchange="loadPosts()">
-            <option value="">Tất cả</option>
-            <option value="pending">Chờ duyệt</option>
-            <option value="approved">Đã duyệt</option>
-            <option value="hidden">Đã ẩn</option>
+          <input type="text" id="post-search" placeholder="🔍 Tìm nội dung bài đăng..." oninput="debounce(loadPosts,400)()">
+          <select id="post-role-filter" onchange="loadPosts()">
+            <option value="">Tất cả tác giả</option>
+            <option value="user">Người dùng</option>
+            <option value="expert">Chuyên gia</option>
           </select>
+          <span id="posts-count" style="font-size:13px;color:var(--gray);margin-left:4px"></span>
         </div>
         <div class="table-wrap" id="posts-table-wrap"><div class="loader"><div class="spinner"></div></div></div>
         <div class="pagination" id="posts-pagination"></div>
@@ -497,7 +497,7 @@ async function loadDashboard() {
     document.getElementById('stats-grid').innerHTML = `
       <div class="stat-card"><div class="stat-label"><i class="fa fa-users"></i> Người dùng</div><div class="stat-val">${stats.total_users.toLocaleString()}</div><div class="stat-sub warn">+${stats.new_users_today} hôm nay</div></div>
       <div class="stat-card orange"><div class="stat-label"><i class="fa fa-user-graduate"></i> Chuyên gia</div><div class="stat-val">${stats.total_experts}</div><div class="stat-sub warn">${stats.pending_expert_requests} chờ duyệt</div></div>
-      <div class="stat-card blue"><div class="stat-label"><i class="fa fa-newspaper"></i> Bài đăng</div><div class="stat-val">${stats.total_posts.toLocaleString()}</div><div class="stat-sub warn">${stats.pending_posts} chờ duyệt</div></div>
+      <div class="stat-card blue"><div class="stat-label"><i class="fa fa-newspaper"></i> Bài đăng</div><div class="stat-val">${stats.total_posts.toLocaleString()}</div><div class="stat-sub">Tổng bài đăng cộng đồng</div></div>
       <div class="stat-card red"><div class="stat-label"><i class="fa fa-leaf"></i> Danh mục bệnh</div><div class="stat-val">${stats.total_diseases}</div><div class="stat-sub">PlantVillage classes</div></div>
     `;
     // Mini tables
@@ -508,12 +508,16 @@ async function loadDashboard() {
       ${expItems.map(r => `<tr><td>${r.full_name}</td><td>${r.specialization}</td><td><button class="btn btn-green btn-sm" onclick="quickApprove(${r.id})">Duyệt</button></td></tr>`).join('')}
       </tbody></table>` : '<div class="loader" style="padding:20px">Không có yêu cầu nào.</div>';
 
-    const postData = await api('GET', '/admin/posts?status=pending&page_size=4');
+    const postData = await api('GET', '/community/posts?page=1&size=4');
     const postItems = (postData.items || []).slice(0, 4);
     document.getElementById('dash-posts').innerHTML = postItems.length ? `
-      <table><thead><tr><th>Tiêu đề</th><th>Tác giả</th><th></th></tr></thead><tbody>
-      ${postItems.map(p => `<tr><td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.title}</td><td>${p.author_name}</td><td><button class="btn btn-green btn-sm" onclick="quickApprovePost(${p.id})">Duyệt</button></td></tr>`).join('')}
-      </tbody></table>` : '<div class="loader" style="padding:20px">Không có bài nào.</div>';
+      <table><thead><tr><th>Nội dung</th><th>Tác giả</th><th>Vai trò</th></tr></thead><tbody>
+      ${postItems.map(p => `<tr>
+        <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px">${(p.content||'').substring(0,50)}...</td>
+        <td style="font-size:12px">${p.author_name||'—'}</td>
+        <td><span class="badge badge-${p.author_role||'user'}" style="font-size:10px">${roleLabel(p.author_role||'user')}</span></td>
+      </tr>`).join('')}
+      </tbody></table>` : '<div class="loader" style="padding:20px">Chưa có bài đăng nào.</div>';
   } catch(e) {
     toast('Lỗi tải dashboard: ' + e.message, 'error');
   }
@@ -671,36 +675,73 @@ async function promoteToExpert(id, name) {
 
 // ── Posts ──────────────────────────────────────────────────────────────────────
 async function loadPosts() {
-  const search = document.getElementById('post-search').value;
-  const status = document.getElementById('post-status-filter').value;
-  let url = `/admin/posts?page=${postsPage}&page_size=15`;
+  const search   = document.getElementById('post-search').value;
+  const roleFilter = document.getElementById('post-role-filter').value;
+  // Gọi /community/posts thay vì /admin/posts vì bài đăng không cần duyệt
+  let url = `/community/posts?page=${postsPage}&size=15`;
   if (search) url += `&search=${encodeURIComponent(search)}`;
-  if (status) url += `&status=${status}`;
   document.getElementById('posts-table-wrap').innerHTML = '<div class="loader"><div class="spinner"></div></div>';
   try {
     const data = await api('GET', url);
-    const rows = data.items.map(p => `
-      <tr>
-        <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.title}</td>
-        <td>${p.author_name}</td>
-        <td><span class="badge badge-${p.author_role}">${roleLabel(p.author_role)}</span></td>
-        <td>${fmtDate(p.created_at)}</td>
-        <td><span class="badge badge-${p.status}">${postStatusLabel(p.status)}</span></td>
+    let items = data.items || data || [];
+    // Lọc theo role nếu có
+    if (roleFilter) items = items.filter(p => p.author_role === roleFilter);
+    document.getElementById('posts-count').textContent = `${data.total || items.length} bài đăng`;
+    const rows = items.map(p => {
+      const preview = (p.content || '').length > 80
+        ? (p.content || '').substring(0, 80) + '...'
+        : (p.content || '');
+      const isHidden = p.status === 'hidden';
+      return `<tr style="${isHidden ? 'opacity:.55' : ''}">
+        <td style="max-width:280px">
+          <div style="font-size:13px;color:#333;line-height:1.4">${preview}</div>
+          ${p.image_urls && p.image_urls.length > 0
+            ? `<div style="font-size:11px;color:#999;margin-top:3px">📷 ${p.image_urls.length} ảnh</div>`
+            : ''}
+        </td>
+        <td>
+          <div style="font-weight:500">${p.author_name || '—'}</div>
+          <span class="badge badge-${p.author_role || 'user'}" style="margin-top:3px">${roleLabel(p.author_role || 'user')}</span>
+        </td>
+        <td style="font-size:12px;color:#888">${fmtDate(p.created_at)}</td>
+        <td>
+          <span class="badge ${isHidden ? 'badge-reject' : 'badge-active'}">
+            ${isHidden ? 'Đã ẩn' : 'Hiển thị'}
+          </span>
+        </td>
         <td><div class="btn-actions">
-          ${p.status !== 'approved' ? `<button class="btn btn-green btn-sm" onclick="updatePost(${p.id},'approved')">Duyệt</button>` : ''}
-          ${p.status !== 'hidden'   ? `<button class="btn btn-outline btn-sm" onclick="updatePost(${p.id},'hidden')">Ẩn</button>` : ''}
+          ${isHidden
+            ? `<button class="btn btn-green btn-sm" onclick="togglePostVisibility('${p.id}','show')">Hiện lại</button>`
+            : `<button class="btn btn-outline btn-sm" onclick="togglePostVisibility('${p.id}','hide')">Ẩn</button>`}
+          <button class="btn btn-red btn-sm" onclick="deletePost('${p.id}')">Xóa</button>
         </div></td>
-      </tr>`).join('') || '<tr class="empty-row"><td colspan="6">Không có bài đăng nào.</td></tr>';
+      </tr>`;
+    }).join('') || '<tr class="empty-row"><td colspan="5">Không có bài đăng nào.</td></tr>';
     document.getElementById('posts-table-wrap').innerHTML = `
-      <table><thead><tr><th>Tiêu đề</th><th>Tác giả</th><th>Vai trò</th><th>Ngày đăng</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
-      <tbody>${rows}</tbody></table>`;
-    renderPagination('posts-pagination', postsPage, data.total, 15, p => { postsPage = p; loadPosts(); });
+      <table><thead><tr>
+        <th>Nội dung</th><th>Tác giả</th><th>Ngày đăng</th><th>Trạng thái</th><th>Thao tác</th>
+      </tr></thead><tbody>${rows}</tbody></table>`;
+    renderPagination('posts-pagination', postsPage, data.total || items.length, 15, p => { postsPage = p; loadPosts(); });
   } catch(e) { toast('Lỗi: ' + e.message, 'error'); }
 }
 
-async function updatePost(id, status) {
-  try { await api('PATCH', `/admin/posts/${id}/status`, { status }); toast('Đã cập nhật bài đăng.', 'success'); loadPosts(); }
-  catch(e) { toast(e.message, 'error'); }
+async function togglePostVisibility(id, action) {
+  // Dùng admin endpoint để ẩn/hiện bài
+  const status = action === 'hide' ? 'hidden' : 'approved';
+  try {
+    await api('PATCH', `/admin/posts/${id}/status`, { status });
+    toast(action === 'hide' ? 'Đã ẩn bài đăng.' : 'Đã hiện lại bài đăng.', 'success');
+    loadPosts();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function deletePost(id) {
+  if (!confirm('Xóa bài đăng này? Hành động không thể hoàn tác.')) return;
+  try {
+    await api('DELETE', `/community/posts/${id}`);
+    toast('Đã xóa bài đăng.', 'info');
+    loadPosts();
+  } catch(e) { toast(e.message, 'error'); }
 }
 
 // ── Diseases ───────────────────────────────────────────────────────────────────
