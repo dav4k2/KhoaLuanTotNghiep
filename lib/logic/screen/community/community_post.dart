@@ -5,7 +5,7 @@ class CommunityPost {
   final String authorId;
   final String authorName;
   final String? authorAvatar;
-  final String authorRole;        // ← THÊM MỚI: "user" | "expert" | "admin"
+  final String authorRole;
   final String content;
   final List<String> imageUrls;
   final int likeCount;
@@ -19,7 +19,7 @@ class CommunityPost {
     required this.authorId,
     required this.authorName,
     this.authorAvatar,
-    this.authorRole = "user",      // ← THÊM MỚI
+    this.authorRole = "user",
     required this.content,
     this.imageUrls    = const [],
     this.likeCount    = 0,
@@ -29,8 +29,47 @@ class CommunityPost {
     this.comments = const [],
   });
 
-  // Kiểm tra có phải chuyên gia không
   bool get isExpert => authorRole == "expert";
+
+  // ── fromJson (parse từ API và từ cache) ─────────────────────
+  factory CommunityPost.fromJson(Map<String, dynamic> json) {
+    return CommunityPost(
+      id:           json['id']?.toString()         ?? '',
+      authorId:     json['authorId']?.toString()   ?? json['author_id']?.toString() ?? '',
+      authorName:   json['authorName']?.toString() ?? json['author_name']?.toString() ?? '',
+      authorAvatar: json['authorAvatar']?.toString() ?? json['author_avatar']?.toString(),
+      authorRole:   json['authorRole']?.toString() ?? json['author_role']?.toString() ?? 'user',
+      content:      json['content']?.toString()    ?? '',
+      imageUrls:    (json['imageUrls'] ?? json['image_urls'] ?? const [])
+          .cast<String>(),
+      likeCount:    (json['likeCount'] ?? json['like_count'] ?? 0) as int,
+      isLikedByMe:  (json['isLikedByMe'] ?? json['is_liked_by_me'] ?? false) as bool,
+      commentCount: (json['commentCount'] ?? json['comment_count'] ?? 0) as int,
+      createdAt:    DateTime.parse(
+        json['createdAt']?.toString() ?? json['created_at']?.toString()
+            ?? DateTime.now().toIso8601String(),
+      ),
+      comments:     ((json['comments'] ?? const []) as List)
+          .map((c) => PostComment.fromJson(c as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+
+  // ── toJson (dùng cho cache SharedPreferences) ───────────────
+  Map<String, dynamic> toJson() => {
+    'id':           id,
+    'authorId':     authorId,
+    'authorName':   authorName,
+    'authorAvatar': authorAvatar,
+    'authorRole':   authorRole,
+    'content':      content,
+    'imageUrls':    imageUrls,
+    'likeCount':    likeCount,
+    'isLikedByMe':  isLikedByMe,
+    'commentCount': commentCount,
+    'createdAt':    createdAt.toIso8601String(),
+    'comments':     comments.map((c) => c.toJson()).toList(),
+  };
 
   CommunityPost copyWith({
     String?            authorName,
@@ -43,9 +82,9 @@ class CommunityPost {
       CommunityPost(
         id:           id,
         authorId:     authorId,
-        authorName:   authorName  ?? this.authorName,
+        authorName:   authorName   ?? this.authorName,
         authorAvatar: authorAvatar,
-        authorRole:   authorRole  ?? this.authorRole,  // ← THÊM
+        authorRole:   authorRole   ?? this.authorRole,
         content:      content,
         imageUrls:    imageUrls,
         likeCount:    likeCount    ?? this.likeCount,
@@ -65,12 +104,14 @@ class CommunityPost {
   }
 }
 
+// ════════════════════════════════════════════════════
+
 class PostComment {
   final String id;
   final String authorId;
   final String authorName;
   final String? authorAvatar;
-  final String authorRole;     // ← THÊM: "user" | "expert" | "admin"
+  final String authorRole;
   final String content;
   final DateTime createdAt;
 
@@ -79,10 +120,37 @@ class PostComment {
     required this.authorId,
     required this.authorName,
     this.authorAvatar,
-    this.authorRole = 'user',  // ← THÊM
+    this.authorRole = 'user',
     required this.content,
     required this.createdAt,
   });
+
+  // ── fromJson ────────────────────────────────────────────────
+  factory PostComment.fromJson(Map<String, dynamic> json) {
+    return PostComment(
+      id:           json['id']?.toString()           ?? '',
+      authorId:     json['authorId']?.toString()     ?? json['author_id']?.toString() ?? '',
+      authorName:   json['authorName']?.toString()   ?? json['author_name']?.toString() ?? '',
+      authorAvatar: json['authorAvatar']?.toString() ?? json['author_avatar']?.toString(),
+      authorRole:   json['authorRole']?.toString()   ?? json['author_role']?.toString() ?? 'user',
+      content:      json['content']?.toString()      ?? '',
+      createdAt:    DateTime.parse(
+        json['createdAt']?.toString() ?? json['created_at']?.toString()
+            ?? DateTime.now().toIso8601String(),
+      ),
+    );
+  }
+
+  // ── toJson ──────────────────────────────────────────────────
+  Map<String, dynamic> toJson() => {
+    'id':           id,
+    'authorId':     authorId,
+    'authorName':   authorName,
+    'authorAvatar': authorAvatar,
+    'authorRole':   authorRole,
+    'content':      content,
+    'createdAt':    createdAt.toIso8601String(),
+  };
 
   String get timeAgo {
     final d = DateTime.now().difference(createdAt);

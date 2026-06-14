@@ -27,6 +27,8 @@ class ApiEndpoints {
   // ── Conversations ─────────────────────────────────────────────
   static const String _convBase = '/conversations';
 
+  static const String uploadChatImage = '/conversations/upload-image';
+
   /// POST /conversations/sync — upsert conversation + messages
   static const String syncConversation = '$_convBase/sync';
 

@@ -13,6 +13,15 @@ class ChatMessage {
   final double? confidence;      // Độ chính xác: 0.94
   final DateTime createdAt;
   final bool isLoading;          // Đang chờ AI trả lời
+  bool get isNetworkImage =>
+      imagePath != null && imagePath!.startsWith('http');
+
+  static int _idCounter = 0;
+
+  static String _generateId() {
+    _idCounter++;
+    return '${DateTime.now().millisecondsSinceEpoch}_$_idCounter';
+  }
 
   ChatMessage({
     required this.id,
@@ -26,22 +35,20 @@ class ChatMessage {
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
 
-  // Tạo tin nhắn của user (text)
   factory ChatMessage.userText(String content) => ChatMessage(
-    id: DateTime.now().millisecondsSinceEpoch.toString(),
+    id: _generateId(),
     role: MessageRole.user,
     type: MessageType.text,
     content: content,
   );
 
-  // Tạo tin nhắn của user (ảnh + kết quả TFLite)
   factory ChatMessage.userImage({
     required String imagePath,
     required String diseaseResult,
     required double confidence,
   }) =>
       ChatMessage(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        id: _generateId(),
         role: MessageRole.user,
         type: MessageType.image,
         content: 'Ảnh chụp lá cây',
@@ -50,18 +57,16 @@ class ChatMessage {
         confidence: confidence,
       );
 
-  // Tạo tin nhắn loading của AI
   factory ChatMessage.assistantLoading() => ChatMessage(
-    id: 'loading_${DateTime.now().millisecondsSinceEpoch}',
+    id: 'loading_${_generateId()}',
     role: MessageRole.assistant,
     type: MessageType.text,
     content: '',
     isLoading: true,
   );
 
-  // Tạo tin nhắn của AI
   factory ChatMessage.assistantText(String content) => ChatMessage(
-    id: DateTime.now().millisecondsSinceEpoch.toString(),
+    id: _generateId(),
     role: MessageRole.assistant,
     type: MessageType.text,
     content: content,

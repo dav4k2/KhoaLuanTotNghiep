@@ -7,6 +7,7 @@ import '../../../core/database/local_database.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../../core/storage/token_storage.dart';
+import '../../../core/service/image_upload_service.dart';
 import 'chat_model.dart';
 import 'chat_state.dart';
 import 'conversation_model.dart';
@@ -135,17 +136,21 @@ class ChatNotifier extends Notifier<ChatState> {
     await LocalDatabase.saveConversation(conv);
     _refreshConversations();
 
+    // Upload ảnh lên backend (Cloudinary) song song với việc phân tích
+    final uploadFuture = ImageUploadService.uploadChatImage(imagePath);
+
     final hasInternet = await _checkInternet();
 
     if (hasInternet) {
-      await _analyzeWithGeminiVision(imagePath, conv, imageMsg);
+      await _analyzeWithGeminiVision(imagePath, uploadFuture, conv, imageMsg);
     } else {
-      await _analyzeWithTFLite(imagePath, conv, imageMsg);
+      await _analyzeWithTFLite(imagePath, uploadFuture, conv, imageMsg);
     }
   }
 
   Future<void> _analyzeWithGeminiVision(
       String imagePath,
+      Future<String?> uploadFuture,
       Conversation conv,
       ChatMessage imageMsg,
       ) async {
@@ -158,8 +163,11 @@ class ChatNotifier extends Notifier<ChatState> {
     try {
       final reply = await _gemini.analyzeImageWithAI(imagePath);
 
+      final uploadedUrl = await uploadFuture;
+      final storedImagePath = uploadedUrl ?? imagePath;
+
       final updatedImageMsg = ChatMessage.userImage(
-        imagePath:     imagePath,
+        imagePath:     storedImagePath,
         diseaseResult: '🤖 Phân tích bởi Gemini AI',
         confidence:    1.0,
       );
@@ -191,20 +199,24 @@ class ChatNotifier extends Notifier<ChatState> {
 
       _syncToBackend(updatedConv, updatedMessages);
     } catch (e) {
-      await _analyzeWithTFLite(imagePath, conv, imageMsg);
+      await _analyzeWithTFLite(imagePath, uploadFuture, conv, imageMsg);
     }
   }
 
   Future<void> _analyzeWithTFLite(
       String imagePath,
+      Future<String?> uploadFuture,
       Conversation conv,
       ChatMessage imageMsg,
       ) async {
     try {
       final result = await plantClassifier.classify(imagePath);
 
+      final uploadedUrl = await uploadFuture;
+      final storedImagePath = uploadedUrl ?? imagePath;
+
       final updatedImageMsg = ChatMessage.userImage(
-        imagePath:     imagePath,
+        imagePath:     storedImagePath,
         diseaseResult: result.displayName,
         confidence:    result.confidence,
       );
@@ -313,6 +325,7 @@ class ChatNotifier extends Notifier<ChatState> {
           'role':           m.role.name,
           'type':           m.type.name,
           'content':        m.content,
+          'image_path':     m.imagePath,
           'disease_result': m.diseaseResult,
           'confidence':     m.confidence,
           'created_at':     m.createdAt.toIso8601String(),

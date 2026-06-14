@@ -163,7 +163,35 @@ class MessageBubble extends StatelessWidget {
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: Image.file(
+                    child: message.isNetworkImage
+                        ? Image.network(
+                      message.imagePath!,
+                      width: 180,
+                      height: 180,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, progress) =>
+                      progress == null
+                          ? child
+                          : SizedBox(
+                        width: 180,
+                        height: 180,
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            color: primaryColor,
+                            strokeWidth: 2,
+                          ),
+                        ),
+                      ),
+                      errorBuilder: (context, error, stack) =>
+                          Container(
+                            width: 180,
+                            height: 180,
+                            color: Colors.grey[200],
+                            child: const Icon(Icons.broken_image,
+                                size: 40, color: Colors.grey),
+                          ),
+                    )
+                        : Image.file(
                       File(message.imagePath!),
                       width: 180,
                       height: 180,

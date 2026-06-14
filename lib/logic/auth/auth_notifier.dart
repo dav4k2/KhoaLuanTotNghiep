@@ -15,7 +15,7 @@ class AuthNotifier extends Notifier<AuthState> {
   late final AuthRepositoryBase _repository =
   ref.read(authRepositoryProvider);
 
-  // ── Đăng ký — thêm fullName ───────────────────────────────
+  // ── Đăng ký ───────────────────────────────────────────────
 
   Future<void> signUp({
     required String fullName,
@@ -27,7 +27,7 @@ class AuthNotifier extends Notifier<AuthState> {
       await _repository.signUp(
         SignUpRequest(fullName: fullName, email: email, password: password),
       );
-      state = AuthState.signUpSuccess(); // ← THAY ĐỔI: không có token
+      state = AuthState.signUpSuccess();
     } on ApiException catch (e) {
       state = AuthState.failure(e.userFriendlyMessage);
     } catch (_) {
@@ -36,6 +36,8 @@ class AuthNotifier extends Notifier<AuthState> {
   }
 
   // ── Đăng nhập ─────────────────────────────────────────────
+  // Lưu ý: việc lưu token đã được xử lý trong AuthRepository._saveSession()
+  // KHÔNG gọi TokenStorage.saveToken() ở đây để tránh duplicate.
 
   Future<void> login({
     required String email,

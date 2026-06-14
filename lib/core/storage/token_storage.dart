@@ -9,14 +9,15 @@ class TokenStorage {
   static const String _keyEmail     = 'user_email';
   static const String _keyUserId    = 'user_id';
   static const String _keyFullName  = 'user_full_name';
-  static const String _keyExpiresAt = 'token_expires_at'; // ← THÊM
+  static const String _keyExpiresAt = 'token_expires_at';
 
   // ── Lưu ──────────────────────────────────────────────────
 
-  static Future<void> saveToken(String token, {int expiresInSeconds = 3600}) async {
+  /// [expiresInSeconds] nên truyền đúng giá trị từ backend (vd: 86400 = 1 ngày).
+  /// Mặc định 7 ngày để tránh logout sớm khi backend không trả expires_in.
+  static Future<void> saveToken(String token, {int expiresInSeconds = 604800}) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyToken, token);
-    // Lưu thời điểm hết hạn (milliseconds since epoch)
     final expiresAt = DateTime.now()
         .add(Duration(seconds: expiresInSeconds))
         .millisecondsSinceEpoch;
@@ -59,19 +60,21 @@ class TokenStorage {
   }
 
   // ── Kiểm tra token còn hạn không ─────────────────────────
-  // buffer: coi như hết hạn sớm 60 giây để tránh race condition
-  static Future<bool> isTokenValid({int bufferSeconds = 60}) async {
+  // Chỉ coi là hết hạn khi LOCAL expiry đã qua — KHÔNG gọi API ở đây.
+  // Việc verify thật sự (gọi /auth/me) do ApiClient xử lý khi gặp 401/403.
+  static Future<bool> isTokenValid() async {
     final prefs     = await SharedPreferences.getInstance();
     final token     = prefs.getString(_keyToken);
     final expiresAt = prefs.getInt(_keyExpiresAt);
 
     if (token == null || token.isEmpty) return false;
-    if (expiresAt == null) return true; // token cũ chưa có expires → coi là hợp lệ
+
+    // Nếu chưa có expires (token cũ được lưu trước khi có field này) → coi là hợp lệ
+    if (expiresAt == null) return true;
 
     final expireTime = DateTime.fromMillisecondsSinceEpoch(expiresAt);
-    return DateTime.now().isBefore(
-      expireTime.subtract(Duration(seconds: bufferSeconds)),
-    );
+    // Buffer 5 phút thay vì 60 giây — tránh false-positive logout
+    return DateTime.now().isBefore(expireTime.subtract(const Duration(minutes: 5)));
   }
 
   static Future<bool> isLoggedIn() async {
