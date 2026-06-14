@@ -25,6 +25,7 @@ class Message(Base):
     role            = Column(String(20), nullable=False)   # "user" | "assistant"
     type            = Column(String(20), nullable=False)   # "text" | "image"
     content         = Column(Text, nullable=False)
+    image_path = Column(String, nullable=True)
     disease_result  = Column(String(255), nullable=True)
     confidence      = Column(Integer, nullable=True)       # 0-100
     created_at      = Column(DateTime(timezone=True), server_default=func.now())

@@ -10,6 +10,7 @@ class MessageIn(BaseModel):
     role: str
     type: str
     content: str
+    image_path: Optional[str] = None
     disease_result: Optional[str] = None
     confidence: Optional[float] = None
     created_at: datetime
@@ -42,6 +43,7 @@ class MessageOut(BaseModel):
     role: str
     type: str
     content: str
+    image_path: Optional[str] = None
     disease_result: Optional[str] = None
     # DB lưu int (0-100), trả về float (0.0-1.0) cho Flutter
     confidence: Optional[float] = None
@@ -58,3 +60,9 @@ class MessageOut(BaseModel):
         if isinstance(v, int) and v > 1:
             return v / 100.0
         return float(v)
+
+class ImageUploadResponse(BaseModel):
+    url: str
+    public_id: str
+    width: Optional[int] = None
+    height: Optional[int] = None
