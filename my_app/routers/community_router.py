@@ -1,5 +1,5 @@
 # routers/community_router.py
-import uuid, os, shutil
+import os
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File as FastAPIFile
 from sqlalchemy.orm import Session, joinedload
 from typing import List
@@ -13,11 +13,10 @@ from schemas.community_schema import (
     CommentCreate, CommentOut,
 )
 from services.notification_service import notify_new_comment, notify_new_like
+from services.cloudinary_service import upload_image, delete_image   # ← dùng service
 
 router = APIRouter(prefix="/community", tags=["Community"])
 
-UPLOAD_DIR = "static/uploads"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # ── Helper: build dict chuẩn cho Flutter ─────────────────────
 def _post_dict(post: Post, current_user_id: str) -> dict:
@@ -26,7 +25,7 @@ def _post_dict(post: Post, current_user_id: str) -> dict:
         "author_id":      post.author_id,
         "author_name":    post.author_name,
         "author_avatar":  post.author_avatar,
-        "author_role":    post.author_role,                          # ← badge chuyên gia
+        "author_role":    post.author_role,
         "content":        post.content,
         "image_urls":     post.image_urls or [],
         "like_count":     len(post.likes),
@@ -41,7 +40,7 @@ def _post_dict(post: Post, current_user_id: str) -> dict:
                 "author_id":     c.author_id,
                 "author_name":   c.author_name,
                 "author_avatar": c.author_avatar,
-                "author_role":   c.author_role,   # ← badge chuyên gia trong comment
+                "author_role":   c.author_role,
                 "content":       c.content,
                 "created_at":    c.created_at.isoformat(),
             }
@@ -51,31 +50,58 @@ def _post_dict(post: Post, current_user_id: str) -> dict:
 
 
 # ═══════════════════════════════════════════════════════════════
+# UPLOAD IMAGES
+# ═══════════════════════════════════════════════════════════════
+
+@router.post("/upload-images", status_code=status.HTTP_200_OK)
+async def upload_images(
+    files: List[UploadFile] = FastAPIFile(...),
+    current_user: User = Depends(get_current_user),
+):
+    """Upload ảnh lên Cloudinary, trả về danh sách URL."""
+    urls = []
+    for file in files:
+        contents = await file.read()
+        try:
+            result = await upload_image(
+                file_bytes=contents,
+                filename=file.filename or "upload",
+                folder="leafdoctor/community",
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=f"Upload Cloudinary thất bại: {e}")
+        urls.append(result["url"])
+    return {"urls": urls}
+
+
+# ═══════════════════════════════════════════════════════════════
 # POST
 # ═══════════════════════════════════════════════════════════════
 
 @router.post("/posts", status_code=status.HTTP_201_CREATED)
-def create_post(                                  # ← đổi async → sync, dùng JSON body
-    payload: PostCreate,                          # ← JSON body thay vì Form
+def create_post(
+    payload: PostCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Tạo bài viết mới — Flutter gửi JSON body."""
+    """Tạo bài viết mới — Flutter gửi JSON body (image_urls đã upload trước)."""
     role = current_user.role
-    role_str = role.value if hasattr(role, 'value') else str(role)
+    role_str = role.value if hasattr(role, "value") else str(role)
 
     post = Post(
         author_id     = str(current_user.id),
         author_name   = current_user.full_name or current_user.email,
         author_avatar = None,
-        author_role   = role_str,                 # ← lưu role khi đăng bài
+        author_role   = role_str,
         content       = payload.content,
         image_urls    = payload.image_urls or [],
     )
     db.add(post)
     db.commit()
     db.refresh(post)
-    # Reload với likes/comments để build dict
+
     post = (
         db.query(Post)
         .options(joinedload(Post.comments), joinedload(Post.likes))
@@ -84,37 +110,19 @@ def create_post(                                  # ← đổi async → sync, d
     )
     return _post_dict(post, str(current_user.id))
 
-@router.post("/upload-images", status_code=status.HTTP_200_OK)
-async def upload_images(
-    files: List[UploadFile] = FastAPIFile(...),
-    current_user: User = Depends(get_current_user),
-):
-    urls = []
-    for file in files:
-        ext      = file.filename.split(".")[-1].lower()
-        filename = f"{uuid.uuid4()}.{ext}"
-        path     = f"{UPLOAD_DIR}/{filename}"
-        with open(path, "wb") as f:
-            shutil.copyfileobj(file.file, f)
-        # Trả về URL public — điều chỉnh domain nếu dùng ngrok/cloud
-        urls.append(f"{ApiEndpoints.baseUrl}/static/uploads/{filename}")
-    return {"urls": urls}
-
 
 @router.get("/posts")
 def get_posts(
     page:  int = 1,
     size:  int = 10,
-    skip:  int = 0,          # giữ lại để không break nếu có client cũ
+    skip:  int = 0,
     limit: int = 0,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Danh sách bài viết — hỗ trợ cả page/size lẫn skip/limit."""
-    # Ưu tiên page/size (Flutter mới), fallback skip/limit (client cũ)
     if limit > 0:
-        offset = skip
-        page_size = limit
+        offset, page_size = skip, limit
     else:
         offset    = (page - 1) * size
         page_size = size
@@ -154,17 +162,34 @@ def get_post(
 
 
 @router.delete("/posts/{post_id}", status_code=status.HTTP_200_OK)
-def delete_post(
+async def delete_post(
     post_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Chỉ tác giả mới xoá được bài của mình."""
+    """Chỉ tác giả mới xoá được bài của mình. Ảnh trên Cloudinary cũng bị xoá."""
     post = db.query(Post).filter(Post.id == post_id).first()
     if not post:
         raise HTTPException(status_code=404, detail="Không tìm thấy bài viết")
     if post.author_id != str(current_user.id):
         raise HTTPException(status_code=403, detail="Không có quyền xoá bài viết này")
+
+    # Xoá ảnh trên Cloudinary (public_id = phần path sau domain)
+    # URL dạng: https://res.cloudinary.com/<cloud>/image/upload/v.../leafdoctor/community/<id>
+    for url in (post.image_urls or []):
+        try:
+            # Trích public_id từ secure_url: bỏ phần trước "/upload/" và bỏ extension
+            if "/upload/" in url:
+                public_id_with_ext = url.split("/upload/", 1)[1]
+                # Bỏ version prefix nếu có (v1234567890/)
+                parts = public_id_with_ext.split("/")
+                if parts[0].startswith("v") and parts[0][1:].isdigit():
+                    parts = parts[1:]
+                public_id = "/".join(parts).rsplit(".", 1)[0]
+                await delete_image(public_id)
+        except Exception:
+            pass  # Không để lỗi Cloudinary block việc xoá DB
+
     db.delete(post)
     db.commit()
     return {"message": "Đã xoá bài viết"}
@@ -186,14 +211,14 @@ async def create_comment(
         raise HTTPException(status_code=404, detail="Không tìm thấy bài viết")
 
     role = current_user.role
-    role_str = role.value if hasattr(role, 'value') else str(role)
+    role_str = role.value if hasattr(role, "value") else str(role)
     comment = Comment(
-        post_id      = post_id,
-        author_id    = str(current_user.id),
-        author_name  = current_user.full_name or current_user.email,
-        author_avatar= None,
-        author_role  = role_str,          # ← lưu role khi bình luận
-        content      = body.content,
+        post_id       = post_id,
+        author_id     = str(current_user.id),
+        author_name   = current_user.full_name or current_user.email,
+        author_avatar = None,
+        author_role   = role_str,
+        content       = body.content,
     )
     db.add(comment)
     db.commit()
@@ -280,7 +305,7 @@ async def toggle_like(
         db.delete(existing)
         db.commit()
         like_count = db.query(Like).filter(Like.post_id == post_id).count()
-        return {"action": "unliked", "like_count": like_count}   # ← Flutter expect action + like_count
+        return {"action": "unliked", "like_count": like_count}
 
     db.add(Like(post_id=post_id, user_id=uid))
     db.commit()
@@ -297,4 +322,4 @@ async def toggle_like(
         except (ValueError, TypeError):
             pass
 
-    return {"action": "liked", "like_count": like_count}         # ← Flutter expect action + like_count
+    return {"action": "liked", "like_count": like_count}
