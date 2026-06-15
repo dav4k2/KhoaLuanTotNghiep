@@ -37,19 +37,12 @@ services:
     restart: unless-stopped
 
     environment:
-      # ── Database ─────────────────────────────────────────────
       DATABASE_URL: postgresql://postgres:181004@db:5432/khoa_luan_db
-
-      # ── JWT ──────────────────────────────────────────────────
       SECRET_KEY:   970faa09e32c07af0833a5c1a30a2c24e8bb6dc80dfc49aa285d7cdfce02fbf4
       DEBUG:        "true"
-
-      # ── Email ─────────────────────────────────────────────────
       MAIL_USERNAME: hoangthanhphongsn04@gmail.com
       MAIL_PASSWORD: hsrd wpue qkmy vcet
       MAIL_FROM:     hoangthanhphongsn04@gmail.com
-
-      # ── Cloudinary ────────────────────────────────────────────
       CLOUDINARY_CLOUD_NAME: dot7myffd
       CLOUDINARY_API_KEY:    451421479289569
       CLOUDINARY_API_SECRET: 9qoj7yMosnGU_kRokduaQvgQGws
@@ -63,6 +56,23 @@ services:
     depends_on:
       db:
         condition: service_healthy
+
+  # ── 3. Ngrok Tunnel ────────────────────────────────────────
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: khoa_luan_ngrok
+    restart: unless-stopped
+
+    environment:
+      - NGROK_AUTHTOKEN=3B51O5TdJJfkeWFyDUfYuPyz7D0_3aMxeUEQzm1fTSWPFnGAq
+
+    command: http api:8000
+
+    ports:
+      - "4040:4040"
+
+    depends_on:
+      - api
 
 # ── Volumes ────────────────────────────────────────────────────
 volumes:

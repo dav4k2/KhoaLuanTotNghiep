@@ -1,6 +1,6 @@
 # routers/community_router.py
-
-from fastapi import APIRouter, Depends, HTTPException, status
+import uuid, os, shutil
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File as FastAPIFile
 from sqlalchemy.orm import Session, joinedload
 from typing import List
 
@@ -16,6 +16,8 @@ from services.notification_service import notify_new_comment, notify_new_like
 
 router = APIRouter(prefix="/community", tags=["Community"])
 
+UPLOAD_DIR = "static/uploads"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # ── Helper: build dict chuẩn cho Flutter ─────────────────────
 def _post_dict(post: Post, current_user_id: str) -> dict:
@@ -81,6 +83,22 @@ def create_post(                                  # ← đổi async → sync, d
         .first()
     )
     return _post_dict(post, str(current_user.id))
+
+@router.post("/upload-images", status_code=status.HTTP_200_OK)
+async def upload_images(
+    files: List[UploadFile] = FastAPIFile(...),
+    current_user: User = Depends(get_current_user),
+):
+    urls = []
+    for file in files:
+        ext      = file.filename.split(".")[-1].lower()
+        filename = f"{uuid.uuid4()}.{ext}"
+        path     = f"{UPLOAD_DIR}/{filename}"
+        with open(path, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+        # Trả về URL public — điều chỉnh domain nếu dùng ngrok/cloud
+        urls.append(f"{ApiEndpoints.baseUrl}/static/uploads/{filename}")
+    return {"urls": urls}
 
 
 @router.get("/posts")

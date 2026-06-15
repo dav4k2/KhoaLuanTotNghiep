@@ -2,6 +2,7 @@
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from config import settings
 from database import Base, engine
@@ -31,6 +32,8 @@ app.include_router(community_router.router)
 app.include_router(conversation_router.router)
 app.include_router(notification_router.router)
 app.include_router(admin_router.router)
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/", tags=["Health"])
 def health_check():
